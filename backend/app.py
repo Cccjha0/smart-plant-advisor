@@ -1,10 +1,14 @@
 from fastapi import FastAPI
 from database import Base, engine
+import models
+from routers import sensor
 
 app = FastAPI()
 
-# Automatically create tables for SQLite development
 Base.metadata.create_all(bind=engine)
+
+app.include_router(sensor.router)
+
 
 @app.get("/")
 def root():
