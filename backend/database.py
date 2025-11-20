@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from config import DB_URL
 
-connect_args = {'check_same_thread': False} if DB_URL.startswith('sqlite') else {}
+connect_args = {"check_same_thread": False} if DB_URL.startswith("sqlite") else {}
 
 engine = create_engine(DB_URL, echo=False, connect_args=connect_args)
 
@@ -16,4 +16,3 @@ def get_db():
         yield db
     finally:
         db.close()
-
