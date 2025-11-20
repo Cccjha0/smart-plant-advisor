@@ -1,10 +1,13 @@
 from fastapi import FastAPI
 from database import Base, engine
-import models  # ensure models are imported so tables are created
+import models
+from routers import sensor
 
 app = FastAPI()
 
 Base.metadata.create_all(bind=engine)
+
+app.include_router(sensor.router)
 
 
 @app.get("/")
