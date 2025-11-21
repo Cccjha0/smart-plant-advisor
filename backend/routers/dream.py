@@ -27,7 +27,7 @@ class DreamOut(BaseModel):
     plant_id: int
     file_path: str
     prompt: Optional[str]
-    metadata: Optional[dict]
+    info: Optional[dict]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -52,7 +52,7 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
         plant_id=payload.plant_id,
         file_path=dream_result["file_path"],
         prompt=dream_result.get("prompt"),
-        metadata=sensor_payload,
+        info=sensor_payload,
         created_at=datetime.utcnow(),
     )
 

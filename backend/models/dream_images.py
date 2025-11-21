@@ -13,7 +13,7 @@ class DreamImageRecord(Base):
     plant_id = Column(Integer, ForeignKey("plants.id"), nullable=False)
     file_path = Column(String, nullable=False)
     prompt = Column(String, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    info = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     plant = relationship("Plant", back_populates="dream_images")
