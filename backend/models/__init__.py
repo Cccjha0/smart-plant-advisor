@@ -3,6 +3,7 @@ from .images import ImageRecord
 from .sensor_records import SensorRecord
 from .weight_records import WeightRecord
 from .analysis_results import AnalysisResult
+from .dream_images import DreamImageRecord
 
 __all__ = [
     "Plant",
@@ -10,4 +11,5 @@ __all__ = [
     "SensorRecord",
     "WeightRecord",
     "AnalysisResult",
+    "DreamImageRecord",
 ]
