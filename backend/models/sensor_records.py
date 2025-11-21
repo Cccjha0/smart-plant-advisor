@@ -1,10 +1,13 @@
 from datetime import datetime
+
 from sqlalchemy import Column, Integer, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
+
 from database import Base
 
+
 class SensorRecord(Base):
-    tablename = "sensor_records"
+    __tablename__ = "sensor_records"
 
     id = Column(Integer, primary_key=True, index=True)
     plant_id = Column(Integer, ForeignKey("plants.id"), nullable=False)
