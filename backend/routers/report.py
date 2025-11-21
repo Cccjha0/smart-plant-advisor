@@ -30,7 +30,6 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
     agg = (
         db.query(
             func.avg(SensorRecord.temperature),
-            func.avg(SensorRecord.humidity),
             func.avg(SensorRecord.light),
             func.avg(SensorRecord.soil_moisture),
         )
@@ -43,9 +42,8 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
 
     sensor_summary_7d = {
         "avg_temperature": agg[0],
-        "avg_humidity": agg[1],
-        "avg_light": agg[2],
-        "avg_soil_moisture": agg[3],
+        "avg_light": agg[1],
+        "avg_soil_moisture": agg[2],
     }
 
     growth_result = growth_service.analyze(plant_id, db)
