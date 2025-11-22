@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import ImageRecord
-from services.cv_service import CVService
+from services.llm_service import LLMService
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ IMAGE_DIR = "data/images"
 
 os.makedirs(IMAGE_DIR, exist_ok=True)
 
-cv_service = CVService()
+llm_service = LLMService()
 
 
 @router.post("/upload_image")
@@ -29,7 +29,7 @@ async def upload_image(
     with open(filepath, "wb") as f:
         f.write(await image.read())
 
-    cv_result = cv_service.predict(filepath)
+    cv_result = llm_service.analyze_image(filepath)
 
     record = ImageRecord(
         plant_id=plant_id,

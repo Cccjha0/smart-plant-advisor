@@ -18,3 +18,4 @@ class Plant(Base):
     sensor_records = relationship("SensorRecord", back_populates="plant")
     weight_records = relationship("WeightRecord", back_populates="plant")
     analysis_results = relationship("AnalysisResult", back_populates="plant")
+    dream_images = relationship("DreamImageRecord", back_populates="plant")
