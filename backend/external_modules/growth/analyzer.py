@@ -1,0 +1,258 @@
+from collections import defaultdict
+from datetime import datetime, timedelta, date
+from typing import Dict, List, Optional, Tuple
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from models import SensorRecord, WeightRecord
+
+# Thresholds for growth rate classification (grams per day)
+MIN_NORMAL_GROWTH = 0.2   # >= this: normal
+MIN_SLOW_GROWTH = 0.05    # 0 < rate < MIN_SLOW_GROWTH -> slow
+
+# Temperature range (°C) considered acceptable
+TEMP_OPT_LOW = 18.0
+TEMP_OPT_HIGH = 30.0
+
+# Light threshold (arbitrary units, depends on sensor calibration)
+LIGHT_OPT_MIN = 200.0
+
+# Soil moisture thresholds (0–1 range, or normalized units)
+SOIL_MOIST_LOW = 0.25
+SOIL_MOIST_HIGH = 0.75
+
+# Reference moisture window for fixed humidity reference weight
+M_REF_LOW = 0.4
+M_REF_HIGH = 0.6
+
+
+def analyze_growth(plant_id: int, db: Session) -> Dict:
+    """
+    Main entry point used by services and schedulers.
+    Returns a dict with:
+      - growth_status: "normal" | "slow" | "stagnant" | "stressed"
+      - growth_rate_3d: float or None
+      - stress_factors: list[str]
+      - debug: internal details
+    """
+    ref_points = _compute_daily_reference_points(plant_id, db, days=7)
+    growth_rate_3d, delta_weight_1d = _compute_growth_rates(ref_points)
+
+    sensor_24h = _compute_sensor_average(plant_id, db, hours=24)
+    sensor_7d = _compute_sensor_average(plant_id, db, days=7)
+
+    stress_factors = _infer_stress_factors(sensor_24h)
+    growth_status = _classify_growth_status(growth_rate_3d, stress_factors)
+
+    debug_ref_points: List[Dict] = []
+    for p in ref_points:
+        debug_ref_points.append(
+            {
+                "date": p["date"].isoformat(),
+                "weight": p["weight"],
+                "avg_soil_moisture": p.get("avg_soil_moisture"),
+                "num_candidates": p.get("num_candidates"),
+                "fallback_used": p.get("fallback_used", False),
+            }
+        )
+
+    debug_info = {
+        "ref_points": debug_ref_points,
+        "delta_weight_1d": delta_weight_1d,
+        "sensor_24h": sensor_24h,
+        "sensor_7d": sensor_7d,
+    }
+
+    return {
+        "growth_status": growth_status,
+        "growth_rate_3d": growth_rate_3d,
+        "stress_factors": stress_factors,
+        "debug": debug_info,
+    }
+
+
+# ------------------------------------------------------------------
+# 1) Daily reference weights using fixed moisture window
+# ------------------------------------------------------------------
+def _compute_daily_reference_points(
+    plant_id: int,
+    db: Session,
+    days: int = 7,
+) -> List[Dict]:
+    since = datetime.utcnow() - timedelta(days=days)
+
+    rows = (
+        db.query(
+            WeightRecord.timestamp,
+            WeightRecord.weight,
+            SensorRecord.soil_moisture,
+        )
+        .join(
+            SensorRecord,
+            (SensorRecord.plant_id == WeightRecord.plant_id)
+            & (SensorRecord.timestamp == WeightRecord.timestamp),
+        )
+        .filter(
+            WeightRecord.plant_id == plant_id,
+            WeightRecord.timestamp >= since,
+        )
+        .order_by(WeightRecord.timestamp.asc())
+        .all()
+    )
+
+    if not rows:
+        return []
+
+    day_candidates: Dict[date, List[Tuple[float, float]]] = defaultdict(list)
+    day_all_weights: Dict[date, List[float]] = defaultdict(list)
+
+    for ts, w, moist in rows:
+        if w is None:
+            continue
+        day_key = ts.date()
+        day_all_weights[day_key].append(w)
+        if moist is not None and M_REF_LOW <= moist <= M_REF_HIGH:
+            day_candidates[day_key].append((w, moist))
+
+    ref_points: List[Dict] = []
+
+    for day_key in sorted(day_all_weights.keys()):
+        candidates = day_candidates.get(day_key, [])
+        fallback_used = False
+
+        if candidates:
+            total_w = sum(w for w, _ in candidates)
+            total_m = sum(m for _, m in candidates)
+            avg_w = total_w / len(candidates)
+            avg_m = total_m / len(candidates)
+            num_candidates = len(candidates)
+        else:
+            fallback_used = True
+            weights = day_all_weights[day_key]
+            if not weights:
+                continue
+            avg_w = sum(weights) / len(weights)
+            avg_m = None
+            num_candidates = 0
+
+        ref_points.append(
+            {
+                "date": day_key,
+                "weight": avg_w,
+                "avg_soil_moisture": avg_m,
+                "num_candidates": num_candidates,
+                "fallback_used": fallback_used,
+            }
+        )
+
+    return ref_points
+
+
+def _compute_growth_rates(
+    ref_points: List[Dict],
+) -> Tuple[Optional[float], Optional[float]]:
+    if len(ref_points) < 2:
+        return None, None
+
+    ref_points_sorted = sorted(ref_points, key=lambda p: p["date"])
+    last = ref_points_sorted[-1]
+    prev = ref_points_sorted[-2]
+    delta_weight_1d = last["weight"] - prev["weight"]
+
+    subset = ref_points_sorted[-3:] if len(ref_points_sorted) >= 3 else ref_points_sorted
+    first = subset[0]
+    last = subset[-1]
+
+    days_span = (last["date"] - first["date"]).days
+    if days_span < 1:
+        days_span = 1
+
+    growth_rate_3d = (last["weight"] - first["weight"]) / days_span
+    return growth_rate_3d, delta_weight_1d
+
+
+# ------------------------------------------------------------------
+# 2) Sensor averaging helpers
+# ------------------------------------------------------------------
+def _compute_sensor_average(
+    plant_id: int,
+    db: Session,
+    hours: Optional[int] = None,
+    days: Optional[int] = None,
+) -> Dict[str, Optional[float]]:
+    if hours is None and days is None:
+        hours = 24
+
+    since = datetime.utcnow() - timedelta(days=days) if days is not None else datetime.utcnow() - timedelta(hours=hours)
+
+    agg = (
+        db.query(
+            func.avg(SensorRecord.temperature),
+            func.avg(SensorRecord.light),
+            func.avg(SensorRecord.soil_moisture),
+        )
+        .filter(
+            SensorRecord.plant_id == plant_id,
+            SensorRecord.timestamp >= since,
+        )
+        .one()
+    )
+
+    return {
+        "avg_temperature": agg[0],
+        "avg_light": agg[1],
+        "avg_soil_moisture": agg[2],
+    }
+
+
+# ------------------------------------------------------------------
+# 3) Stress factor inference
+# ------------------------------------------------------------------
+def _infer_stress_factors(
+    sensor_avg: Dict[str, Optional[float]],
+) -> List[str]:
+    stress_factors: List[str] = []
+
+    avg_temp = sensor_avg.get("avg_temperature")
+    avg_light = sensor_avg.get("avg_light")
+    avg_soil = sensor_avg.get("avg_soil_moisture")
+
+    if avg_light is not None and avg_light < LIGHT_OPT_MIN:
+        stress_factors.append("low_light")
+
+    if avg_soil is not None:
+        if avg_soil < SOIL_MOIST_LOW:
+            stress_factors.append("soil_too_dry")
+        elif avg_soil > SOIL_MOIST_HIGH:
+            stress_factors.append("soil_too_wet")
+
+    if avg_temp is not None and (avg_temp < TEMP_OPT_LOW or avg_temp > TEMP_OPT_HIGH):
+        stress_factors.append("temp_out_of_range")
+
+    return stress_factors
+
+
+# ------------------------------------------------------------------
+# 4) Growth status classification
+# ------------------------------------------------------------------
+def _classify_growth_status(
+    growth_rate_3d: Optional[float],
+    stress_factors: List[str],
+) -> str:
+    if growth_rate_3d is None:
+        return "normal"
+
+    if growth_rate_3d <= 0:
+        base_status = "stagnant"
+    elif growth_rate_3d < MIN_SLOW_GROWTH:
+        base_status = "slow"
+    elif growth_rate_3d < MIN_NORMAL_GROWTH:
+        base_status = "slow"
+    else:
+        base_status = "normal"
+
+    if stress_factors and growth_rate_3d <= MIN_SLOW_GROWTH:
+        return "stressed"
+
+    return base_status
