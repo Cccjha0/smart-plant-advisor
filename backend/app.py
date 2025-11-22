@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from database import Base, engine
 import models
-from routers import sensor, image, analysis, report, admin
+from routers import sensor, image, analysis, report, admin, plants, dream
 
 app = FastAPI()
 
@@ -12,6 +12,8 @@ app.include_router(image.router)
 app.include_router(analysis.router)
 app.include_router(report.router)
 app.include_router(admin.router)
+app.include_router(plants.router)
+app.include_router(dream.router)
 
 
 @app.get("/")

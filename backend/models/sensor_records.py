@@ -13,7 +13,6 @@ class SensorRecord(Base):
     plant_id = Column(Integer, ForeignKey("plants.id"), nullable=False)
 
     temperature = Column(Float, nullable=True)
-    humidity = Column(Float, nullable=True)
     light = Column(Float, nullable=True)
     soil_moisture = Column(Float, nullable=True)
 
