@@ -26,17 +26,24 @@ SOIL_MOIST_HIGH = 0.75
 M_REF_LOW = 0.4
 M_REF_HIGH = 0.6
 
+# Heuristic thresholds for detecting fertilizer events
+FERT_WEIGHT_JUMP_MIN = 10.0      # grams; adjust based on real data
+FERT_MOISTURE_DELTA_MAX = 0.05   # |Δsoil_moisture| <= this => moisture considered "unchanged"
+
 
 def analyze_growth(plant_id: int, db: Session) -> Dict:
     """
     Main entry point used by services and schedulers.
-    Returns a dict with:
-      - growth_status: "normal" | "slow" | "stagnant" | "stressed"
-      - growth_rate_3d: float or None
-      - stress_factors: list[str]
-      - debug: internal details
+
+    Returns:
+    {
+      "growth_status": "normal" | "slow" | "stagnant" | "stressed",
+      "growth_rate_3d": float or None,
+      "stress_factors": list[str],
+      "debug": {...}
+    }
     """
-    ref_points = _compute_daily_reference_points(plant_id, db, days=7)
+    ref_points, fertilizer_events = _compute_daily_reference_points(plant_id, db, days=7)
     growth_rate_3d, delta_weight_1d = _compute_growth_rates(ref_points)
 
     sensor_24h = _compute_sensor_average(plant_id, db, hours=24)
@@ -57,11 +64,22 @@ def analyze_growth(plant_id: int, db: Session) -> Dict:
             }
         )
 
+    debug_fertilizer_events: List[Dict] = []
+    for ev in fertilizer_events:
+        debug_fertilizer_events.append(
+            {
+                "timestamp": ev["timestamp"].isoformat(),
+                "delta_weight": ev["delta_weight"],
+                "delta_moisture": ev["delta_moisture"],
+            }
+        )
+
     debug_info = {
         "ref_points": debug_ref_points,
         "delta_weight_1d": delta_weight_1d,
         "sensor_24h": sensor_24h,
         "sensor_7d": sensor_7d,
+        "fertilizer_events": debug_fertilizer_events,
     }
 
     return {
@@ -73,13 +91,13 @@ def analyze_growth(plant_id: int, db: Session) -> Dict:
 
 
 # ------------------------------------------------------------------
-# 1) Daily reference weights using fixed moisture window
+# 1) Daily reference weights with fertilizer filtering
 # ------------------------------------------------------------------
 def _compute_daily_reference_points(
     plant_id: int,
     db: Session,
     days: int = 7,
-) -> List[Dict]:
+) -> Tuple[List[Dict], List[Dict]]:
     since = datetime.utcnow() - timedelta(days=days)
 
     rows = (
@@ -102,18 +120,51 @@ def _compute_daily_reference_points(
     )
 
     if not rows:
-        return []
+        return [], []
+
+    fertilizer_offset = 0.0
+    corrected_samples: List[Tuple[datetime, float, Optional[float]]] = []
+    fertilizer_events: List[Dict] = []
+
+    prev_w: Optional[float] = None
+    prev_m: Optional[float] = None
+
+    for ts, w, moist in rows:
+        if w is None:
+            prev_w = w
+            prev_m = moist
+            continue
+
+        if prev_w is not None:
+            delta_w = w - prev_w
+            delta_m = 0.0
+            if prev_m is not None and moist is not None:
+                delta_m = moist - prev_m
+
+            if delta_w >= FERT_WEIGHT_JUMP_MIN and abs(delta_m) <= FERT_MOISTURE_DELTA_MAX:
+                fertilizer_offset += delta_w
+                fertilizer_events.append(
+                    {
+                        "timestamp": ts,
+                        "delta_weight": float(delta_w),
+                        "delta_moisture": float(delta_m),
+                    }
+                )
+
+        corrected_weight = w - fertilizer_offset
+        corrected_samples.append((ts, corrected_weight, moist))
+
+        prev_w = w
+        prev_m = moist
 
     day_candidates: Dict[date, List[Tuple[float, float]]] = defaultdict(list)
     day_all_weights: Dict[date, List[float]] = defaultdict(list)
 
-    for ts, w, moist in rows:
-        if w is None:
-            continue
+    for ts, corrected_w, moist in corrected_samples:
         day_key = ts.date()
-        day_all_weights[day_key].append(w)
+        day_all_weights[day_key].append(corrected_w)
         if moist is not None and M_REF_LOW <= moist <= M_REF_HIGH:
-            day_candidates[day_key].append((w, moist))
+            day_candidates[day_key].append((corrected_w, moist))
 
     ref_points: List[Dict] = []
 
@@ -122,8 +173,11 @@ def _compute_daily_reference_points(
         fallback_used = False
 
         if candidates:
-            total_w = sum(w for w, _ in candidates)
-            total_m = sum(m for _, m in candidates)
+            total_w = 0.0
+            total_m = 0.0
+            for w, m in candidates:
+                total_w += w
+                total_m += m
             avg_w = total_w / len(candidates)
             avg_m = total_m / len(candidates)
             num_candidates = len(candidates)
@@ -146,7 +200,7 @@ def _compute_daily_reference_points(
             }
         )
 
-    return ref_points
+    return ref_points, fertilizer_events
 
 
 def _compute_growth_rates(
@@ -169,12 +223,10 @@ def _compute_growth_rates(
         days_span = 1
 
     growth_rate_3d = (last["weight"] - first["weight"]) / days_span
+
     return growth_rate_3d, delta_weight_1d
 
 
-# ------------------------------------------------------------------
-# 2) Sensor averaging helpers
-# ------------------------------------------------------------------
 def _compute_sensor_average(
     plant_id: int,
     db: Session,
@@ -206,9 +258,6 @@ def _compute_sensor_average(
     }
 
 
-# ------------------------------------------------------------------
-# 3) Stress factor inference
-# ------------------------------------------------------------------
 def _infer_stress_factors(
     sensor_avg: Dict[str, Optional[float]],
 ) -> List[str]:
@@ -233,9 +282,6 @@ def _infer_stress_factors(
     return stress_factors
 
 
-# ------------------------------------------------------------------
-# 4) Growth status classification
-# ------------------------------------------------------------------
 def _classify_growth_status(
     growth_rate_3d: Optional[float],
     stress_factors: List[str],
