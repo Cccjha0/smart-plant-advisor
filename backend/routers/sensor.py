@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from database import get_db
-from models import SensorRecord, Plant
+from models import SensorRecord, WeightRecord, Plant
 
 router = APIRouter()
 
@@ -16,6 +16,12 @@ class SensorCreate(BaseModel):
     temperature: Optional[float] = None
     light: Optional[float] = None
     soil_moisture: Optional[float] = None
+    timestamp: Optional[datetime] = None
+
+
+class WeightCreate(BaseModel):
+    plant_id: int
+    weight: float
     timestamp: Optional[datetime] = None
 
 
@@ -44,3 +50,24 @@ def create_sensor_record(payload: SensorCreate, db: Session = Depends(get_db)):
         "record_id": record.id,
         "timestamp": record.timestamp,
     }
+
+
+@router.post("/weight")
+def create_weight_record(payload: WeightCreate, db: Session = Depends(get_db)):
+    plant = db.query(Plant).filter(Plant.id == payload.plant_id).first()
+    if not plant:
+        raise HTTPException(status_code=400, detail=f"Plant {payload.plant_id} does not exist.")
+
+    ts = payload.timestamp or datetime.utcnow()
+
+    record = WeightRecord(
+        plant_id=payload.plant_id,
+        weight=payload.weight,
+        timestamp=ts,
+    )
+
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    return {"status": "ok", "id": record.id, "timestamp": record.timestamp}
