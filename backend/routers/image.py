@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, Form, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -20,14 +20,20 @@ llm_service = LLMService()
 @router.post("/upload_image")
 async def upload_image(
     plant_id: int = Form(...),
-    image: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    image_path: str = Form(...),
+    db: Session = Depends(get_db),
 ):
-    filename = f"{datetime.utcnow().timestamp()}_{image.filename}"
+    # Expect absolute path; copy into managed storage
+    if not os.path.isabs(image_path):
+        raise HTTPException(status_code=400, detail="image_path must be an absolute path")
+    if not os.path.exists(image_path):
+        raise HTTPException(status_code=400, detail="image_path does not exist")
+
+    filename = f"{datetime.utcnow().timestamp()}_{os.path.basename(image_path)}"
     filepath = os.path.join(IMAGE_DIR, filename)
 
-    with open(filepath, "wb") as f:
-        f.write(await image.read())
+    with open(image_path, "rb") as src, open(filepath, "wb") as dst:
+        dst.write(src.read())
 
     cv_result = llm_service.analyze_image(filepath)
 
@@ -51,5 +57,5 @@ async def upload_image(
         "plant_type": record.plant_type,
         "leaf_health": record.leaf_health,
         "symptoms": record.symptoms,
-        "file_path": filepath
+        "file_path": filepath,
     }
