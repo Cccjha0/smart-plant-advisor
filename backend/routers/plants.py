@@ -36,3 +36,11 @@ def create_plant(payload: PlantCreate, db: Session = Depends(get_db)):
 def list_plants(db: Session = Depends(get_db)):
     plants = db.query(Plant).all()
     return plants
+
+
+@router.get("/plants/by-nickname/{nickname}", response_model=PlantOut)
+def get_plant_by_nickname(nickname: str, db: Session = Depends(get_db)):
+    plant = db.query(Plant).filter(Plant.nickname == nickname).first()
+    if not plant:
+        return None
+    return plant
