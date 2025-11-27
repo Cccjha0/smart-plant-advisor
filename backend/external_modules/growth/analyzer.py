@@ -18,11 +18,12 @@ TEMP_OPT_HIGH = 30.0
 # Light threshold (arbitrary units, depends on sensor calibration)
 LIGHT_OPT_MIN = 200.0
 
-# Soil moisture thresholds (0–1 range, or normalized units)
+# Soil moisture thresholds (normalized 0–1; sensor gives 0=wet, 255=dry)
+SOIL_SCALE = 255.0
 SOIL_MOIST_LOW = 0.25
 SOIL_MOIST_HIGH = 0.75
 
-# Reference moisture window for fixed humidity reference weight
+# Reference moisture window for fixed humidity reference weight (normalized)
 M_REF_LOW = 0.4
 M_REF_HIGH = 0.6
 
@@ -127,19 +128,23 @@ def _compute_daily_reference_points(
     fertilizer_events: List[Dict] = []
 
     prev_w: Optional[float] = None
-    prev_m: Optional[float] = None
+    prev_m_norm: Optional[float] = None
 
-    for ts, w, moist in rows:
+    for ts, w, moist_raw in rows:
+        moist_norm = None
+        if moist_raw is not None:
+            moist_norm = max(0.0, min(1.0, moist_raw / SOIL_SCALE))
+
         if w is None:
             prev_w = w
-            prev_m = moist
+            prev_m_norm = moist_norm
             continue
 
         if prev_w is not None:
             delta_w = w - prev_w
             delta_m = 0.0
-            if prev_m is not None and moist is not None:
-                delta_m = moist - prev_m
+            if prev_m_norm is not None and moist_norm is not None:
+                delta_m = moist_norm - prev_m_norm
 
             if delta_w >= FERT_WEIGHT_JUMP_MIN and abs(delta_m) <= FERT_MOISTURE_DELTA_MAX:
                 fertilizer_offset += delta_w
@@ -152,19 +157,19 @@ def _compute_daily_reference_points(
                 )
 
         corrected_weight = w - fertilizer_offset
-        corrected_samples.append((ts, corrected_weight, moist))
+        corrected_samples.append((ts, corrected_weight, moist_norm))
 
         prev_w = w
-        prev_m = moist
+        prev_m_norm = moist_norm
 
     day_candidates: Dict[date, List[Tuple[float, float]]] = defaultdict(list)
     day_all_weights: Dict[date, List[float]] = defaultdict(list)
 
-    for ts, corrected_w, moist in corrected_samples:
+    for ts, corrected_w, moist_norm in corrected_samples:
         day_key = ts.date()
         day_all_weights[day_key].append(corrected_w)
-        if moist is not None and M_REF_LOW <= moist <= M_REF_HIGH:
-            day_candidates[day_key].append((corrected_w, moist))
+        if moist_norm is not None and M_REF_LOW <= moist_norm <= M_REF_HIGH:
+            day_candidates[day_key].append((corrected_w, moist_norm))
 
     ref_points: List[Dict] = []
 
@@ -251,10 +256,15 @@ def _compute_sensor_average(
         .one()
     )
 
+    soil_raw = agg[2]
+    soil_norm = None
+    if soil_raw is not None:
+        soil_norm = max(0.0, min(1.0, soil_raw / SOIL_SCALE))
+
     return {
         "avg_temperature": agg[0],
         "avg_light": agg[1],
-        "avg_soil_moisture": agg[2],
+        "avg_soil_moisture": soil_norm,
     }
 
 
