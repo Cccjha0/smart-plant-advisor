@@ -2,10 +2,21 @@ from fastapi import FastAPI
 from database import Base, engine
 import models
 from routers import sensor, image, analysis, report, admin, plants, dream
+from services.scheduler import start_scheduler, shutdown_scheduler
 
 app = FastAPI()
 
 Base.metadata.create_all(bind=engine)
+
+
+@app.on_event("startup")
+def _start_scheduler():
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def _stop_scheduler():
+    shutdown_scheduler()
 
 app.include_router(sensor.router)
 app.include_router(image.router)
