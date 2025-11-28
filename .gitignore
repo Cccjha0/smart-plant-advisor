@@ -218,3 +218,8 @@ local.db
 *.sqlite
 *.sqlite3
 logs/
+
+# Frontend build artifacts and dependencies
+frontend-web/node_modules/
+frontend-web/dist/
+frontend-web/.vite/
