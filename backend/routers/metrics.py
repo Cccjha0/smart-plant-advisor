@@ -62,9 +62,35 @@ def _weight_first_in_window(db: Session, plant_id: int, since: datetime):
     return row
 
 
+def _watering_signature(moist_before: Optional[float], moist_after: Optional[float]) -> bool:
+    if moist_before is None or moist_after is None:
+        return False
+    # Heuristic: moisture drop of -20 or more (raw scale 0 wet, 255 dry)
+    return (moist_after - moist_before) <= -20
+
+
+def _last_watering(db: Session, plant_id: int) -> Optional[datetime]:
+    latest = (
+        db.query(SensorRecord.soil_moisture, SensorRecord.timestamp)
+        .filter(SensorRecord.plant_id == plant_id, SensorRecord.soil_moisture.isnot(None))
+        .order_by(SensorRecord.timestamp.desc())
+        .limit(50)
+        .all()
+    )
+    if len(latest) < 2:
+        return None
+    for i in range(len(latest) - 1):
+        m_after, t_after = latest[i]
+        m_before, t_before = latest[i + 1]
+        if _watering_signature(m_before, m_after):
+            return t_after
+    return None
+
+
 @router.get("/metrics/{plant_id}")
 def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     now = datetime.utcnow()
+    last_watering_ts = _last_watering(db, plant_id)
 
     # Temperature
     temp_now = _latest_value(db, plant_id, SensorRecord.temperature)
@@ -105,12 +131,27 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     weight_now = latest_weight[0] if latest_weight else None
     first_24h = _weight_first_in_window(db, plant_id, now - timedelta(hours=24))
     weight_24h_diff = None
+    water_loss_per_hour = None
     if latest_weight and first_24h:
         weight_24h_diff = latest_weight[0] - first_24h[0]
         hours_span = max(1.0, (latest_weight[1] - first_24h[1]).total_seconds() / 3600.0)
         water_loss_per_hour = weight_24h_diff / hours_span
-    else:
-        water_loss_per_hour = None
+
+    hours_since_last_watering = None
+    weight_drop_since_last_watering = None
+    if last_watering_ts and latest_weight:
+        hours_since_last_watering = (now - last_watering_ts).total_seconds() / 3600.0
+        weight_before = (
+            db.query(WeightRecord.weight)
+            .filter(WeightRecord.plant_id == plant_id, WeightRecord.timestamp <= last_watering_ts, WeightRecord.weight.isnot(None))
+            .order_by(WeightRecord.timestamp.desc())
+            .first()
+        )
+        if weight_before:
+            weight_drop_since_last_watering = latest_weight[0] - weight_before[0]
+            # Recompute water loss per hour using post-watering window to avoid watering spikes
+            hours_span = max(1.0, hours_since_last_watering)
+            water_loss_per_hour = weight_drop_since_last_watering / hours_span
 
     metrics = {
         "temperature": {
@@ -134,8 +175,8 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
             "weight_now": weight_now,
             "weight_24h_diff": weight_24h_diff,
             "water_loss_per_hour": water_loss_per_hour,
-            "hours_since_last_watering": None,
-            "weight_drop_since_last_watering": None,
+            "hours_since_last_watering": hours_since_last_watering,
+            "weight_drop_since_last_watering": weight_drop_since_last_watering,
         },
     }
     return metrics
