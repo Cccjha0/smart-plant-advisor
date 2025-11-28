@@ -51,7 +51,13 @@ def analyze_growth(plant_id: int, db: Session) -> Dict:
     sensor_7d = _compute_sensor_average(plant_id, db, days=7)
 
     stress_factors = _infer_stress_factors(sensor_24h)
-    growth_status = _classify_growth_status(growth_rate_3d, stress_factors)
+    day_count = len(ref_points)
+    short_term_mode = day_count < 3
+
+    if short_term_mode:
+        growth_status = _classify_short_term_status(delta_weight_1d, stress_factors)
+    else:
+        growth_status = _classify_growth_status(growth_rate_3d, stress_factors)
 
     debug_ref_points: List[Dict] = []
     for p in ref_points:
@@ -297,7 +303,7 @@ def _classify_growth_status(
     stress_factors: List[str],
 ) -> str:
     if growth_rate_3d is None:
-        return "normal"
+        return "stressed" if stress_factors else "normal"
 
     if growth_rate_3d <= 0:
         base_status = "stagnant"
@@ -312,3 +318,23 @@ def _classify_growth_status(
         return "stressed"
 
     return base_status
+
+
+def _classify_short_term_status(
+    delta_weight_1d: Optional[float],
+    stress_factors: List[str],
+) -> str:
+    """
+    Demo-friendly short-term classification when data < 3 days.
+    - Uses 1-day weight delta and stress.
+    - Thresholds are slightly lenient to show state changes.
+    """
+    if delta_weight_1d is None:
+        return "stressed" if stress_factors else "normal"
+
+    if delta_weight_1d <= 0:
+        return "stressed" if stress_factors else "stagnant"
+    elif delta_weight_1d < 0.05:
+        return "stressed" if stress_factors else "slow"
+    else:
+        return "stressed" if stress_factors else "normal"
