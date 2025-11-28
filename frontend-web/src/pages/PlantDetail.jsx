@@ -10,20 +10,34 @@ export default function PlantDetail() {
   const [plant, setPlant] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [metrics, setMetrics] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [pRes, aRes, mRes] = await Promise.all([
-          fetch(`${API_BASE}/plants/${id}`), // fallback; if no endpoint, will fail silently
-          fetch(`${API_BASE}/analysis/${id}`),
-          fetch(`${API_BASE}/metrics/${id}`),
-        ]);
-        if (pRes.ok) setPlant(await pRes.json());
+        setError(null);
+        // Try /plants/:id; if missing, fall back to /plants then filter
+        let plantData = null;
+        const pRes = await fetch(`${API_BASE}/plants/${id}`);
+        if (pRes.ok) {
+          plantData = await pRes.json();
+        } else {
+          const listRes = await fetch(`${API_BASE}/plants`);
+          if (listRes.ok) {
+            const list = await listRes.json();
+            plantData = list.find((p) => String(p.id) === String(id)) || null;
+          }
+        }
+        setPlant(plantData);
+
+        const aRes = await fetch(`${API_BASE}/analysis/${id}`);
         if (aRes.ok) setAnalysis(await aRes.json());
+
+        const mRes = await fetch(`${API_BASE}/metrics/${id}`);
         if (mRes.ok) setMetrics(await mRes.json());
       } catch (e) {
         console.error(e);
+        setError("加载失败，请检查后端或网络");
       }
     };
     load();
@@ -39,7 +53,7 @@ export default function PlantDetail() {
           </div>
         ))}
       </div>
-      {activeTab === "overview" && <OverviewTab plant={plant} analysis={analysis} />}
+      {activeTab === "overview" && <OverviewTab plant={plant} analysis={analysis} error={error} />}
       {activeTab === "metrics" && <MetricsTab metrics={metrics} />}
       {activeTab === "reports" && <ReportsTab />}
       {activeTab === "photos" && <PhotosTab />}
@@ -48,11 +62,13 @@ export default function PlantDetail() {
   );
 }
 
-function OverviewTab({ plant, analysis }) {
+function OverviewTab({ plant, analysis, error }) {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="card">
         <h3>植物信息</h3>
+        {error && <div className="muted">{error}</div>}
+        {!plant && !error && <div className="muted">加载中...</div>}
         <div className="muted">昵称: {plant?.nickname || "未命名"}</div>
         <div className="muted">种类: {plant?.species || "未填写"}</div>
       </div>

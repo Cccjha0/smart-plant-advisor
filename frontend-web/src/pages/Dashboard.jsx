@@ -7,10 +7,12 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
+        setError(null);
         const [sRes, pRes] = await Promise.all([
           fetch(`${API_BASE}/admin/stats`),
           fetch(`${API_BASE}/plants`),
@@ -21,6 +23,7 @@ export default function Dashboard() {
         setPlants(pJson);
       } catch (e) {
         console.error(e);
+        setError("加载失败，请检查后端或网络");
       } finally {
         setLoading(false);
       }
@@ -52,6 +55,7 @@ export default function Dashboard() {
           <h3>植物列表</h3>
           <span className="muted">点击行查看详情</span>
         </div>
+        {error && <div className="muted">{error}</div>}
         <table className="list">
           <thead>
             <tr>
