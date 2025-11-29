@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Plant, SensorRecord, WeightRecord, ImageRecord, AnalysisResult
+from models import Plant, SensorRecord, WeightRecord, ImageRecord, AnalysisResult, DreamImageRecord
 
 router = APIRouter()
 
@@ -35,4 +35,15 @@ def get_stats(db: Session = Depends(get_db)):
         "total_analysis_results": total_analysis_results,
         "sensor_first_timestamp": first_ts.isoformat() if first_ts else None,
         "sensor_last_timestamp": last_ts.isoformat() if last_ts else None,
+    }
+
+
+@router.get("/system/overview")
+def system_overview(db: Session = Depends(get_db)):
+    return {
+        "total_plants": db.query(func.count(Plant.id)).scalar() or 0,
+        "total_images": db.query(func.count(ImageRecord.id)).scalar() or 0,
+        "total_sensor_records": db.query(func.count(SensorRecord.id)).scalar() or 0,
+        "total_analysis_results": db.query(func.count(AnalysisResult.id)).scalar() or 0,
+        "total_dream_images": db.query(func.count(DreamImageRecord.id)).scalar() or 0,
     }
