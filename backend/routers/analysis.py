@@ -46,20 +46,8 @@ def get_analysis(plant_id: int, db: Session = Depends(get_db)):
 
     growth_result = growth_service.analyze(plant_id, db)
 
-    if latest_image:
-        plant_type = latest_image.plant_type
-        leaf_health = latest_image.leaf_health
-        symptoms = latest_image.symptoms
-    else:
-        plant_type = None
-        leaf_health = None
-        symptoms = None
-
     return {
         "plant_id": plant_id,
-        "plant_type": plant_type,
-        "leaf_health": leaf_health,
-        "symptoms": symptoms,
         "growth_status": growth_result.get("growth_status"),
         "growth_rate_3d": growth_result.get("growth_rate_3d"),
         "sensor_summary_7d": sensor_summary_7d,

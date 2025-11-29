@@ -4,9 +4,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import func
 
 from database import SessionLocal
-from models import Plant, ImageRecord, SensorRecord, AnalysisResult, WeightRecord, DreamImageRecord
+from config import SUPABASE_DREAM_BUCKET
+from models import Plant, SensorRecord, AnalysisResult, WeightRecord, DreamImageRecord
 from services.growth_service import GrowthService
 from services.llm_service import LLMService
+from services.storage import upload_bytes
 
 scheduler = BackgroundScheduler()
 growth_service = GrowthService()
@@ -61,14 +63,6 @@ def _run_single_analysis_and_optionals(
     plant_id = plant.id
     seven_days_ago = datetime.utcnow() - timedelta(days=7)
 
-    # Latest image (if any)
-    latest_image = (
-        db.query(ImageRecord)
-        .filter(ImageRecord.plant_id == plant_id)
-        .order_by(ImageRecord.captured_at.desc())
-        .first()
-    )
-
     # Aggregate 7-day sensor summary
     agg = (
         db.query(
@@ -92,25 +86,15 @@ def _run_single_analysis_and_optionals(
     # Growth analysis
     growth_result = growth_service.analyze(plant_id, db)
 
-    if latest_image:
-        plant_type = latest_image.plant_type
-        leaf_health = latest_image.leaf_health
-        symptoms = latest_image.symptoms
-    else:
-        plant_type = None
-        leaf_health = None
-        symptoms = None
-
     # Build payload for potential LLM usage
     analysis_payload = {
-        "plant_type": plant_type,
-        "leaf_health": leaf_health,
-        "symptoms": symptoms,
         "growth_status": growth_result.get("growth_status"),
         "growth_rate_3d": growth_result.get("growth_rate_3d"),
         "sensor_summary_7d": sensor_summary_7d,
         "stress_factors": growth_result.get("stress_factors", []),
     }
+    leaf_health = None
+    symptoms = None
 
     # Optionally generate LLM text report
     llm_short = None
@@ -126,8 +110,8 @@ def _run_single_analysis_and_optionals(
         growth_status=analysis_payload["growth_status"],
         growth_rate_3d=analysis_payload["growth_rate_3d"],
         stress_factors=analysis_payload["stress_factors"],
-        leaf_health=analysis_payload["leaf_health"],
-        symptoms=analysis_payload["symptoms"],
+        leaf_health=leaf_health,
+        symptoms=symptoms,
         llm_report_short=llm_short,
         llm_report_long=llm_long,
         created_at=datetime.utcnow(),
@@ -137,26 +121,31 @@ def _run_single_analysis_and_optionals(
 
     # Optionally generate dream garden image
     if include_dream:
-        growth_status = analysis_payload["growth_status"]
-        prompt_parts = [
-            f"plant {plant.nickname or plant_id}",
-            f"status {growth_status}",
-            f"light {sensor_summary_7d['avg_light']}",
-            f"moisture {sensor_summary_7d['avg_soil_moisture']}",
-        ]
-        prompt = "; ".join([p for p in prompt_parts if p is not None])
         dream_result = llm_service.generate_dream_image(plant_id, analysis_payload)
-        file_path = dream_result["file_path"]
+        dream_bytes = dream_result.get("data")
+        ext = dream_result.get("ext", "png")
+        if dream_bytes:
+            ts = int(datetime.utcnow().timestamp())
+            ext_clean = ext.lstrip(".") or "png"
+            storage_path = f"{plant_id}/{ts}.{ext_clean}"
+            try:
+                public_url = upload_bytes(
+                    SUPABASE_DREAM_BUCKET,
+                    storage_path,
+                    dream_bytes,
+                    f"image/{ext_clean}",
+                )
+            except Exception:
+                public_url = None
 
-        db.add(
-            DreamImageRecord(
-                plant_id=plant_id,
-                file_path=file_path,
-                prompt=prompt,
-                info=analysis_payload,
-                created_at=datetime.utcnow(),
+            db.add(
+                DreamImageRecord(
+                    plant_id=plant_id,
+                    file_path=public_url or storage_path,
+                    info=analysis_payload,
+                    created_at=datetime.utcnow(),
+                )
             )
-        )
 
 
 def run_daily_analysis():

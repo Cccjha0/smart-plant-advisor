@@ -14,8 +14,4 @@ class ImageRecord(Base):
     file_path = Column(String, nullable=False)
     captured_at = Column(DateTime, default=datetime.utcnow)
 
-    plant_type = Column(String, nullable=True)
-    leaf_health = Column(String, nullable=True)
-    symptoms = Column(JSON, nullable=True)
-
     plant = relationship("Plant", back_populates="images")

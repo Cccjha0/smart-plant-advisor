@@ -48,19 +48,7 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
 
     growth_result = growth_service.analyze(plant_id, db)
 
-    if latest_image:
-        plant_type = latest_image.plant_type
-        leaf_health = latest_image.leaf_health
-        symptoms = latest_image.symptoms
-    else:
-        plant_type = None
-        leaf_health = None
-        symptoms = None
-
     analysis_payload = {
-        "plant_type": plant_type,
-        "leaf_health": leaf_health,
-        "symptoms": symptoms,
         "growth_status": growth_result.get("growth_status"),
         "growth_rate_3d": growth_result.get("growth_rate_3d"),
         "sensor_summary_7d": sensor_summary_7d,
@@ -74,8 +62,6 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
         growth_status=analysis_payload["growth_status"],
         growth_rate_3d=analysis_payload["growth_rate_3d"],
         stress_factors=analysis_payload["stress_factors"],
-        leaf_health=analysis_payload["leaf_health"],
-        symptoms=analysis_payload["symptoms"],
         llm_report_short=llm_output.get("short_report"),
         llm_report_long=llm_output.get("long_report"),
         created_at=datetime.utcnow(),

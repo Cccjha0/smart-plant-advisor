@@ -12,7 +12,6 @@ class DreamImageRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     plant_id = Column(Integer, ForeignKey("plants.id"), nullable=False)
     file_path = Column(String, nullable=False)
-    prompt = Column(String, nullable=True)
     info = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
