@@ -206,20 +206,20 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-AGENT.md
-.env.local
-.env.*.local
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-local.db
-*.db
-*.sqlite
-*.sqlite3
-logs/
-
-# Frontend build artifacts and dependencies
+# Frontend build/deps
 frontend-web/node_modules/
-frontend-web/dist/
 frontend-web/.vite/
+.idea/
+frontend-web/dist/
+frontend-web/.turbo/
+frontend-web/.next/
+frontend-web/.cache/
+frontend-web/.parcel-cache/
+frontend-web/yarn.lock
+frontend-web/pnpm-lock.yaml
+frontend-web/node_modules/.cache/
+
+# Edge collector artifacts
+edge-collector/photo/
+edge-collector/logs/
+edge-collector/__pycache__/

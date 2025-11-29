@@ -3,7 +3,7 @@ from datetime import datetime
 from statistics import mean
 from typing import List
 
-from api import get_plant_id_by_nickname, upload_image_path, upload_sensor_and_weight
+from api import get_plant_id_by_nickname, upload_image_file, upload_sensor_and_weight
 from camera import capture_photo
 from config import (
     BASE_URL,
@@ -80,7 +80,7 @@ def main():
             log(f"\n{'!'*20} hourly photo {'!'*20}")
             photo_path = capture_photo()
             if photo_path:
-                upload_image_path(plant_id, photo_path)
+                upload_image_file(plant_id, photo_path)
             else:
                 log("[photo] capture failed; will retry next hour")
             last_photo_time = current_time
