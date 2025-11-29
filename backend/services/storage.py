@@ -21,6 +21,11 @@ def upload_bytes(bucket: str, path: str, data: bytes, content_type: Optional[str
     client = get_supabase()
     if not content_type:
         content_type = mimetypes.guess_type(path)[0] or "application/octet-stream"
-    client.storage.from_(bucket).upload(path, data, {"content-type": content_type, "upsert": True})
+    # Avoid header type issues by removing before upload and not sending bool headers
+    try:
+        client.storage.from_(bucket).remove([path])
+    except Exception:
+        pass
+    client.storage.from_(bucket).upload(path, data, {"content-type": content_type})
     public_url = client.storage.from_(bucket).get_public_url(path)
     return public_url
