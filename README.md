@@ -38,3 +38,6 @@ Frontend: React (Vite) + Tailwind + shadcn/ui (under `frontend-web/`)
 - CORS enabled in backend for `http://localhost:5173`.
 - Tailwind configured with custom dark theme; see `frontend-web/tailwind.config.js`.
 - Edge collector (Raspberry Pi) scripts in `edge/` (sensor read, weight, photo capture, upload).
+- LLM inputs (for vision/report):
+  - Provide: `image_url`, `plant_id`, `nickname`, `sensor_data` (temp, light lux, soil_moisture %, weight), `growth_status`, `growth_rate_3d`, `stress_factors`, `metrics_snapshot` (from `/metrics/{plant_id}`).
+  - Expect: `plant_type`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis`, `alert`.

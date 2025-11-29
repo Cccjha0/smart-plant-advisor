@@ -32,3 +32,7 @@ Scheduler auto-starts in `app.py` and stops cleanly on shutdown.
 - Config: set `BASE_URL`, `PLANT_NICKNAME` (optional) in `config.py`.
 - Sends sensor + weight to `/sensor` and `/weight`.
 - Captures hourly photo and uploads the **file** (multipart) to `/upload_image` so backend stores it in Supabase Storage.
+
+## LLM input/output expectations (vision + report)
+- Provide: `image_url`, `plant_id`, `nickname`, `sensor_data` (temp, light lux, soil_moisture %, weight), `growth_status`, `growth_rate_3d`, `stress_factors`, `metrics_snapshot` (from `/metrics/{plant_id}` key fields).
+- Expect: `plant_type`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis`, `alert`.
