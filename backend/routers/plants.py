@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, ConfigDict
@@ -141,3 +142,59 @@ def get_raw_sensor_data(
         "total": total,
         "records": records,
     }
+
+
+@router.get("/plants/{plant_id}/raw-data/export")
+def export_raw_sensor_data(
+    plant_id: int,
+    sensor_type: str = Query(..., description="temperature|light|soil_moisture"),
+    date: Optional[str] = Query(None, description="ISO date YYYY-MM-DD"),
+    start_time: Optional[str] = Query(None, description="ISO datetime start"),
+    end_time: Optional[str] = Query(None, description="ISO datetime end"),
+    db: Session = Depends(get_db),
+):
+    sensor_map = {
+        "temperature": (SensorRecord.temperature, "Temperature", "°C"),
+        "light": (SensorRecord.light, "Light", "lux"),
+        "soil_moisture": (SensorRecord.soil_moisture, "SoilMoisture", "raw"),
+    }
+    if sensor_type not in sensor_map:
+        raise HTTPException(status_code=400, detail="Unsupported sensor_type")
+
+    column, label, unit = sensor_map[sensor_type]
+
+    # Time range
+    if date:
+        from datetime import date as date_cls
+        try:
+            d = date_cls.fromisoformat(date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format, expected YYYY-MM-DD")
+        start_dt = datetime.combine(d, datetime.min.time())
+        end_dt = datetime.combine(d, datetime.max.time())
+    else:
+        try:
+            start_dt = datetime.fromisoformat(start_time) if start_time else None
+            end_dt = datetime.fromisoformat(end_time) if end_time else None
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid datetime format")
+
+    q = (
+        db.query(column, SensorRecord.timestamp)
+        .filter(SensorRecord.plant_id == plant_id, column.isnot(None))
+        .order_by(SensorRecord.timestamp.asc())
+    )
+    if start_dt:
+        q = q.filter(SensorRecord.timestamp >= start_dt)
+    if end_dt:
+        q = q.filter(SensorRecord.timestamp <= end_dt)
+
+    rows = q.all()
+
+    def _iter_csv():
+        yield "time,sensor_type,value,unit\n"
+        for val, ts in rows:
+            time_label = ts.strftime("%H:%M")
+            yield f"{time_label},{label},{val},{unit}\n"
+
+    return StreamingResponse(_iter_csv(), media_type="text/csv")
