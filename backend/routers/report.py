@@ -52,7 +52,6 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
         "growth_status": growth_result.get("growth_status"),
         "growth_rate_3d": growth_result.get("growth_rate_3d"),
         "sensor_summary_7d": sensor_summary_7d,
-        "stress_factors": growth_result.get("stress_factors", []),
     }
 
     llm_output = llm_service.generate(analysis_payload)
@@ -61,9 +60,10 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
         plant_id=plant_id,
         growth_status=analysis_payload["growth_status"],
         growth_rate_3d=analysis_payload["growth_rate_3d"],
-        stress_factors=analysis_payload["stress_factors"],
-        llm_report_short=llm_output.get("short_report"),
-        llm_report_long=llm_output.get("long_report"),
+        growth_overview=llm_output.get("growth_overview"),
+        environment_assessment=llm_output.get("environment_assessment"),
+        suggestions=llm_output.get("suggestions"),
+        full_analysis=llm_output.get("full_analysis"),
         created_at=datetime.utcnow(),
     )
 
@@ -75,8 +75,10 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
         "plant_id": plant_id,
         "analysis": analysis_payload,
         "report": {
-            "short": result.llm_report_short,
-            "long": result.llm_report_long,
+            "growth_overview": result.growth_overview,
+            "environment_assessment": result.environment_assessment,
+            "suggestions": result.suggestions,
+            "full_analysis": result.full_analysis,
         },
         "analysis_result_id": result.id,
     }

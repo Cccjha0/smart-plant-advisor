@@ -28,7 +28,7 @@ class DreamOut(BaseModel):
     id: int
     plant_id: int
     file_path: str
-    info: Optional[dict]
+    description: Optional[str]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -71,7 +71,7 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
     record = DreamImageRecord(
         plant_id=payload.plant_id,
         file_path=public_url,
-        info=sensor_payload,
+        description=None,
         created_at=datetime.utcnow(),
     )
 
