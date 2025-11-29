@@ -210,3 +210,16 @@ __marimo__/
 frontend-web/node_modules/
 frontend-web/.vite/
 .idea/
+frontend-web/dist/
+frontend-web/.turbo/
+frontend-web/.next/
+frontend-web/.cache/
+frontend-web/.parcel-cache/
+frontend-web/yarn.lock
+frontend-web/pnpm-lock.yaml
+frontend-web/node_modules/.cache/
+
+# Edge collector artifacts
+edge-collector/photo/
+edge-collector/logs/
+edge-collector/__pycache__/
