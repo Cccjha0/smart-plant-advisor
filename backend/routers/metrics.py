@@ -180,3 +180,133 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
         },
     }
     return metrics
+
+
+def _iterate_buckets(start: datetime, end: datetime, bucket: timedelta):
+    cursor = start
+    while cursor < end:
+        nxt = cursor + bucket
+        yield cursor, nxt
+        cursor = nxt
+
+
+@router.get("/metrics/{plant_id}/daily-7d")
+def get_metrics_daily_7d(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Last 7 days daily aggregates (UTC) for weight, soil_moisture, temperature, light.
+    """
+    end = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    start = end - timedelta(days=7)
+    bucket = timedelta(days=1)
+
+    sensor_rows = (
+        db.query(
+            SensorRecord.timestamp,
+            SensorRecord.temperature,
+            SensorRecord.light,
+            SensorRecord.soil_moisture,
+        )
+        .filter(
+            SensorRecord.plant_id == plant_id,
+            SensorRecord.timestamp >= start,
+            SensorRecord.timestamp < end,
+        )
+        .all()
+    )
+    weight_rows = (
+        db.query(WeightRecord.timestamp, WeightRecord.weight)
+        .filter(
+            WeightRecord.plant_id == plant_id,
+            WeightRecord.timestamp >= start,
+            WeightRecord.timestamp < end,
+            WeightRecord.weight.isnot(None),
+        )
+        .all()
+    )
+
+    def _avg(seq, idx):
+        vals = [x[idx] for x in seq if x[idx] is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    metrics = []
+    for b_start, b_end in _iterate_buckets(start, end, bucket):
+        s_filtered = [r for r in sensor_rows if b_start <= r[0] < b_end]
+        w_filtered = [r for r in weight_rows if b_start <= r[0] < b_end]
+        metrics.append(
+            {
+                "date": b_start.date().isoformat(),
+                "weight": _avg(w_filtered, 1),
+                "soil_moisture": _avg(s_filtered, 3),
+                "temperature": _avg(s_filtered, 1),
+                "light": _avg(s_filtered, 2),
+            }
+        )
+
+    return {
+        "plant_id": plant_id,
+        "granularity": "day",
+        "start_date": start.date().isoformat(),
+        "end_date": (end - timedelta(days=1)).date().isoformat(),
+        "metrics": metrics,
+    }
+
+
+@router.get("/metrics/{plant_id}/hourly-24h")
+def get_metrics_hourly_24h(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Last 24h hourly aggregates (UTC) for weight, soil_moisture, temperature, light.
+    """
+    end = datetime.utcnow().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    start = end - timedelta(hours=24)
+    bucket = timedelta(hours=1)
+
+    sensor_rows = (
+        db.query(
+            SensorRecord.timestamp,
+            SensorRecord.temperature,
+            SensorRecord.light,
+            SensorRecord.soil_moisture,
+        )
+        .filter(
+            SensorRecord.plant_id == plant_id,
+            SensorRecord.timestamp >= start,
+            SensorRecord.timestamp < end,
+        )
+        .all()
+    )
+    weight_rows = (
+        db.query(WeightRecord.timestamp, WeightRecord.weight)
+        .filter(
+            WeightRecord.plant_id == plant_id,
+            WeightRecord.timestamp >= start,
+            WeightRecord.timestamp < end,
+            WeightRecord.weight.isnot(None),
+        )
+        .all()
+    )
+
+    def _avg(seq, idx):
+        vals = [x[idx] for x in seq if x[idx] is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    metrics = []
+    for b_start, b_end in _iterate_buckets(start, end, bucket):
+        s_filtered = [r for r in sensor_rows if b_start <= r[0] < b_end]
+        w_filtered = [r for r in weight_rows if b_start <= r[0] < b_end]
+        metrics.append(
+            {
+                "hour": b_start.strftime("%Y-%m-%d %H:00"),
+                "weight": _avg(w_filtered, 1),
+                "soil_moisture": _avg(s_filtered, 3),
+                "temperature": _avg(s_filtered, 1),
+                "light": _avg(s_filtered, 2),
+            }
+        )
+
+    return {
+        "plant_id": plant_id,
+        "granularity": "hour",
+        "start_time": start.isoformat(),
+        "end_time": (end - timedelta(hours=1)).isoformat(),
+        "metrics": metrics,
+    }
