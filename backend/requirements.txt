@@ -6,3 +6,4 @@ python-dotenv
 apscheduler
 pydantic
 supabase
+cozepy

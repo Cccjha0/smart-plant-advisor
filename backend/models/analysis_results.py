@@ -14,13 +14,10 @@ class AnalysisResult(Base):
 
     growth_status = Column(String, nullable=True)
     growth_rate_3d = Column(Float, nullable=True)
-    stress_factors = Column(JSON, nullable=True)
-
-    leaf_health = Column(String, nullable=True)
-    symptoms = Column(JSON, nullable=True)
-
-    llm_report_short = Column(String, nullable=True)
-    llm_report_long = Column(String, nullable=True)
+    growth_overview = Column(String, nullable=True)
+    environment_assessment = Column(String, nullable=True)
+    suggestions = Column(String, nullable=True)
+    full_analysis = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
