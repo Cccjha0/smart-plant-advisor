@@ -7,7 +7,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 from database import get_db
-from models import Plant, AnalysisResult, SensorRecord
+from models import Plant, AnalysisResult, SensorRecord, WeightRecord
 from external_modules.growth import analyzer as growth_analyzer
 
 router = APIRouter()
