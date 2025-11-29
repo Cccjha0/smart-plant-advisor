@@ -77,6 +77,13 @@ def create_weight_record(payload: WeightCreate, db: Session = Depends(get_db)):
     return {"status": "ok", "id": record.id, "timestamp": record.timestamp}
 
 
+def _soil_to_pct(raw: float | None) -> float | None:
+    if raw is None:
+        return None
+    pct = (255.0 - raw) / 255.0 * 100.0
+    return round(max(0.0, min(100.0, pct)), 2)
+
+
 @router.get("/sensor/recent/soil")
 def recent_soil_moisture(plant_id: int, limit: int = 10, db: Session = Depends(get_db)):
     limit = _validate_limit(limit)
@@ -87,7 +94,14 @@ def recent_soil_moisture(plant_id: int, limit: int = 10, db: Session = Depends(g
         .limit(limit)
         .all()
     )
-    return [{"soil_moisture": r[0], "timestamp": r[1]} for r in rows]
+    return [
+        {
+            "soil_moisture_raw": r[0],
+            "soil_moisture_pct": _soil_to_pct(r[0]),
+            "timestamp": r[1],
+        }
+        for r in rows
+    ]
 
 
 @router.get("/sensor/recent/temperature")

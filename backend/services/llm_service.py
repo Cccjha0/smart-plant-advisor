@@ -1,39 +1,69 @@
-from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+try:
+    from external_modules.llm.workflow_service import WorkflowService  # type: ignore
+except Exception:
+    WorkflowService = None
 
 
 class LLMService:
+    def __init__(self) -> None:
+        self.workflow: Optional[WorkflowService] = None
+        if WorkflowService:
+            try:
+                self.workflow = WorkflowService()
+            except Exception:
+                # If Coze is not configured/installed, keep mock fallback
+                self.workflow = None
+
     def generate(self, analysis_payload: Dict) -> Dict:
-        """Mock LLM text report."""
+        """Generate LLM text report (mock fallback)."""
         plant_type = analysis_payload.get("plant_type") or "your plant"
         growth_status = analysis_payload.get("growth_status") or "normal"
 
-        short = (
-            f"Status: {growth_status}. "
-            f"Keep monitoring temperature, light, and soil moisture. "
-            f"Adjust watering and light if conditions move out of the recommended range."
-        )
-
-        long = (
-            "This is a mock weekly report.\n\n"
+        growth_overview = f"Growth status: {growth_status}. Trending stable."
+        environment_assessment = "Env OK. Keep light and watering in recommended range."
+        suggestions = "Monitor moisture daily; adjust light if below target."
+        full_analysis = (
+            "This is a mock analysis.\n\n"
             f"Plant type: {plant_type}\n"
-            f"Growth status: {growth_status}\n\n"
-            "In the real version, this section will contain a detailed bilingual (CN/EN) "
-            "analysis of sensor trends, leaf health, and recommended actions."
+            f"Growth status: {growth_status}\n"
+            "In production, this will include detailed CN/EN analysis of sensor trends and actions."
         )
 
         return {
-            "short_report": short,
-            "long_report": long,
+            "growth_overview": growth_overview,
+            "environment_assessment": environment_assessment,
+            "suggestions": suggestions,
+            "full_analysis": full_analysis,
         }
 
-    def analyze_image(self, image_path: str) -> Dict[str, Any]:
-        """Mock vision analysis using LLM (placeholder)."""
-        # In production, call a vision-capable LLM here.
+    def analyze_image(self, image_url: str, sensor_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Run vision analysis via Coze workflow when available; fallback to mock.
+        """
+        sensor_payload = sensor_data or {}
+        if self.workflow:
+            try:
+                result = self.workflow.analyze_plant(image_url=image_url, sensor_data=sensor_payload)
+                return {
+                    "plant_type": result.get("plant_type"),
+                    "growth_overview": result.get("growth_overview"),
+                    "environment_assessment": result.get("environment_assessment"),
+                    "suggestions": result.get("suggestions"),
+                    "full_analysis": result.get("full_analysis"),
+                    "raw_response": result.get("raw_response"),
+                }
+            except Exception:
+                # On any failure, fall back to mock
+                pass
+
         return {
             "plant_type": "unknown",
-            "leaf_health": "healthy",
-            "symptoms": [],
+            "growth_overview": None,
+            "environment_assessment": None,
+            "suggestions": None,
+            "full_analysis": None,
         }
 
     def generate_dream_image(self, plant_id: int, sensor_payload: Dict[str, Any]) -> Dict[str, Any]:

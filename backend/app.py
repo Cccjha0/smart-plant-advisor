@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import Base, engine
 import models
-from routers import sensor, image, analysis, report, admin, plants, dream, metrics
+from routers import sensor, image, analysis, report, admin, plants, dream, metrics, alerts
 from services.scheduler import start_scheduler, shutdown_scheduler, run_periodic_llm_and_dream
 
 app = FastAPI()
@@ -46,6 +46,7 @@ app.include_router(admin.router)
 app.include_router(plants.router)
 app.include_router(dream.router)
 app.include_router(metrics.router)
+app.include_router(alerts.router)
 
 
 @app.get("/")
