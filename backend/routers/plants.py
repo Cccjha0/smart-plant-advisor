@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
 from database import get_db
 from models import Plant, AnalysisResult, SensorRecord
