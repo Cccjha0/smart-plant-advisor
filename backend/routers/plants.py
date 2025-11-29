@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from database import get_db
 from models import Plant, AnalysisResult, SensorRecord
+from external_modules.growth import analyzer as growth_analyzer
 
 router = APIRouter()
 
@@ -198,3 +199,98 @@ def export_raw_sensor_data(
             yield f"{time_label},{label},{val},{unit}\n"
 
     return StreamingResponse(_iter_csv(), media_type="text/csv")
+
+
+@router.get("/plants/{plant_id}/growth-analytics")
+def get_growth_analytics(plant_id: int, days: int = 7, db: Session = Depends(get_db)):
+    """
+    Growth analytics visualization data for last N days (default 7).
+    """
+    days = max(1, min(days, 14))
+    now = datetime.utcnow().date()
+    start_date = now - timedelta(days=days - 1)
+    ref_points, _ = growth_analyzer._compute_daily_reference_points(plant_id, db, days=days)
+
+    # Daily weights: actual (avg) and reference (from ref_points)
+    # Build map date -> reference weight
+    ref_map = {p["date"]: p["weight"] for p in ref_points}
+
+    # Actual daily avg weight
+    weight_rows = (
+        db.query(WeightRecord.timestamp, WeightRecord.weight)
+        .filter(
+            WeightRecord.plant_id == plant_id,
+            WeightRecord.timestamp >= datetime.combine(start_date, datetime.min.time()),
+            WeightRecord.weight.isnot(None),
+        )
+        .order_by(WeightRecord.timestamp.asc())
+        .all()
+    )
+    daily_actual: dict[datetime.date, list[float]] = {}
+    for ts, w in weight_rows:
+        d = ts.date()
+        if d not in daily_actual:
+            daily_actual[d] = []
+        daily_actual[d].append(w)
+
+    daily_weight = []
+    for i in range(days):
+        d = start_date + timedelta(days=i)
+        actual_vals = daily_actual.get(d, [])
+        actual_avg = sum(actual_vals) / len(actual_vals) if actual_vals else None
+        daily_weight.append(
+            {
+                "date": d.isoformat(),
+                "actual_weight": actual_avg,
+                "reference_weight": ref_map.get(d),
+            }
+        )
+
+    # Growth rate 3d series: reuse reference points to compute rolling 3-day slope
+    growth_rate_series = []
+    ref_sorted = sorted(ref_points, key=lambda p: p["date"])
+    for idx in range(len(ref_sorted)):
+        window = ref_sorted[max(0, idx - 2): idx + 1]
+        if len(window) >= 2:
+            first = window[0]
+            last = window[-1]
+            span_days = (last["date"] - first["date"]).days or 1
+            rate = (last["weight"] - first["weight"]) / span_days
+            growth_rate_series.append(
+                {
+                    "date": ref_sorted[idx]["date"].isoformat(),
+                    "growth_rate_pct": rate,  # grams/day; front-end can scale if needed
+                }
+            )
+        else:
+            growth_rate_series.append(
+                {
+                    "date": ref_sorted[idx]["date"].isoformat(),
+                    "growth_rate_pct": None,
+                }
+            )
+
+    # Stress scores: derive from latest analysis debug (24h averages)
+    analysis = growth_analyzer.analyze_growth(plant_id, db)
+    stress_factors = set(analysis.get("stress_factors") or [])
+
+    def score_for(name: str) -> float:
+        # Simple mapping: present -> 7/10, absent -> 1/10
+        return 7.0 if name in stress_factors else 1.0
+
+    stress_scores = {
+        "temperature": score_for("temp_out_of_range"),
+        "humidity": score_for("humidity"),  # placeholder if humidity stress added
+        "light": score_for("low_light"),
+        "growth": score_for("growth"),  # placeholder, not in factors; kept for UI slot
+    }
+
+    return {
+        "plant_id": plant_id,
+        "days": days,
+        "start_date": start_date.isoformat(),
+        "end_date": now.isoformat(),
+        "daily_weight": daily_weight,
+        "growth_rate_3d": growth_rate_series,
+        "stress_scores": stress_scores,
+    }
