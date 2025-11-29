@@ -1,10 +1,23 @@
-from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+try:
+    from external_modules.llm.workflow_service import WorkflowService  # type: ignore
+except Exception:
+    WorkflowService = None
 
 
 class LLMService:
+    def __init__(self) -> None:
+        self.workflow: Optional[WorkflowService] = None
+        if WorkflowService:
+            try:
+                self.workflow = WorkflowService()
+            except Exception:
+                # If Coze is not configured/installed, keep mock fallback
+                self.workflow = None
+
     def generate(self, analysis_payload: Dict) -> Dict:
-        """Mock LLM text report."""
+        """Generate LLM text report (mock fallback)."""
         plant_type = analysis_payload.get("plant_type") or "your plant"
         growth_status = analysis_payload.get("growth_status") or "normal"
 
@@ -27,9 +40,26 @@ class LLMService:
             "long_report": long,
         }
 
-    def analyze_image(self, image_path: str) -> Dict[str, Any]:
-        """Mock vision analysis using LLM (placeholder)."""
-        # In production, call a vision-capable LLM here.
+    def analyze_image(self, image_url: str, sensor_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Run vision analysis via Coze workflow when available; fallback to mock.
+        """
+        sensor_payload = sensor_data or {}
+        if self.workflow:
+            try:
+                result = self.workflow.analyze_plant(image_url=image_url, sensor_data=sensor_payload)
+                return {
+                    "plant_type": result.get("plant_type"),
+                    "leaf_health": result.get("leaf_health"),
+                    "symptoms": result.get("symptoms", []),
+                    "report_short": result.get("report_short"),
+                    "report_long": result.get("report_long"),
+                    "raw_response": result.get("raw_response"),
+                }
+            except Exception:
+                # On any failure, fall back to mock
+                pass
+
         return {
             "plant_type": "unknown",
             "leaf_health": "healthy",
