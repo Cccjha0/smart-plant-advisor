@@ -206,20 +206,7 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-AGENT.md
-.env.local
-.env.*.local
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-local.db
-*.db
-*.sqlite
-*.sqlite3
-logs/
-
-# Frontend build artifacts and dependencies
+# Frontend build/deps
 frontend-web/node_modules/
-frontend-web/dist/
 frontend-web/.vite/
+.idea/
