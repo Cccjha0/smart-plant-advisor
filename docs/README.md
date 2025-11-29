@@ -26,3 +26,9 @@ Located at `services/scheduler.py`:
 - `schedule_post_watering_job(plant_id, delay_minutes=60)`: schedules one-off full pipeline 1h after watering if recent data exists.
 
 Scheduler auto-starts in `app.py` and stops cleanly on shutdown.
+
+## Edge Collector (Pi)
+- Folder: `edge-collector/`
+- Config: set `BASE_URL`, `PLANT_NICKNAME` (optional) in `config.py`.
+- Sends sensor + weight to `/sensor` and `/weight`.
+- Captures hourly photo and uploads the **file** (multipart) to `/upload_image` so backend stores it in Supabase Storage.

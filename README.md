@@ -28,6 +28,12 @@ Frontend: React (Vite) + Tailwind + shadcn/ui (under `frontend-web/`)
   - `/dreams` gallery
   - `/admin` admin & scheduler view
 
+## Edge Collector (Raspberry Pi)
+- Location: `edge-collector/`
+- Configure `BASE_URL`, `PLANT_NICKNAME` (optional) in `config.py`.
+- Sends sensor + weight to `/sensor` and `/weight`; captures hourly photos and uploads the **file** via multipart to `/upload_image` (backend stores in Supabase Storage).
+- Ignore local artifacts (`edge-collector/photo/`, `edge-collector/logs/`) by default.
+
 ## Dev Notes
 - CORS enabled in backend for `http://localhost:5173`.
 - Tailwind configured with custom dark theme; see `frontend-web/tailwind.config.js`.

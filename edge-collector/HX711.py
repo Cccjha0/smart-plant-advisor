@@ -7,10 +7,10 @@ class HX711:
         self.pd_sck = pd_sck
         self.gain = gain
 
- 
+
         self.chip = lgpio.gpiochip_open(0)
 
-  
+
         lgpio.gpio_claim_input(self.chip, self.dout)
         lgpio.gpio_claim_output(self.chip, self.pd_sck)
 
@@ -22,13 +22,13 @@ class HX711:
         elif gain == 32:
             self.GAIN = 2
 
-        self.read()  
+        self.read()
 
     def is_ready(self):
         return lgpio.gpio_read(self.chip, self.dout) == 0
 
     def read(self):
-    
+
         while not self.is_ready():
             time.sleep(0.001)
 
@@ -38,7 +38,7 @@ class HX711:
             raw_data = (raw_data << 1) | lgpio.gpio_read(self.chip, self.dout)
             lgpio.gpio_write(self.chip, self.pd_sck, 0)
 
-    
+
         for _ in range(self.GAIN):
             lgpio.gpio_write(self.chip, self.pd_sck, 1)
             lgpio.gpio_write(self.chip, self.pd_sck, 0)
