@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  /* shadcn-style CSS vars */
+  --background: 210 50% 9%;
+  --foreground: 210 20% 90%;
+  --muted: 210 15% 60%;
+  --muted-foreground: 210 10% 70%;
+  --popover: 210 40% 12%;
+  --popover-foreground: 210 20% 90%;
+  --card: 210 35% 12%;
+  --card-foreground: 210 20% 90%;
+  --border: 210 25% 26%;
+  --input: 210 25% 20%;
+  --primary: 155 60% 55%;
+  --primary-foreground: 155 20% 10%;
+  --secondary: 210 25% 18%;
+  --secondary-foreground: 210 20% 88%;
+  --accent: 210 30% 20%;
+  --accent-foreground: 210 20% 88%;
+  --destructive: 0 70% 55%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 155 60% 55%;
+  --radius: 12px;
+}
+
+body {
+  @apply bg-base text-text m-0 min-h-screen;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  input,
+  select,
+  textarea {
+    @apply bg-white text-black border border-gray-300 rounded-lg px-3 py-2 placeholder:text-gray-500 focus:border-accent focus:ring-2 focus:ring-accent/40 outline-none;
+  }
+
+  option {
+    @apply bg-white text-black;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #ffffff;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
+
+a {
+  @apply text-inherit no-underline;
+}
+
+.layout {
+  @apply flex min-h-screen;
+}
+
+.sidebar {
+  @apply w-64 bg-[#0f2433] border-r border-border p-6 sticky top-0 h-screen;
+}
+
+.nav-item {
+  @apply block px-3 py-2 rounded-xl text-muted mb-2 border border-transparent hover:border-border hover:text-text transition;
+}
+
+.nav-item.active {
+  @apply border-border text-text bg-panel;
+}
+
+.content {
+  @apply flex-1 p-6 max-w-screen-xl mx-auto;
+}
+
+.card {
+  @apply bg-panel border border-border rounded-xl p-4 shadow-card;
+}
+
+.section-title {
+  @apply text-2xl font-semibold mb-3;
+}
+
+.tag {
+  @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs border border-border;
+}
+
+.tag.ok {
+  @apply border-accent text-accent;
+}
+.tag.warn {
+  @apply border-warn text-warn;
+}
+.tag.danger {
+  @apply border-danger text-danger;
+}
+
+.table {
+  @apply w-full border-collapse;
+}
+.table th,
+.table td {
+  @apply px-3 py-2 border-b border-border text-sm;
+}
+
+.grid-cards {
+  @apply grid gap-4 md:grid-cols-2 xl:grid-cols-4;
+}
+
+.button {
+  @apply px-4 py-2 rounded-xl border border-border bg-panel text-text cursor-pointer hover:border-accent transition;
+}
+.button.primary {
+  @apply border-accent text-accent;
+}

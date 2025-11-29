@@ -1,18 +1,16 @@
-import os
 from datetime import datetime
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
+from config import SUPABASE_PLANT_BUCKET
 from database import get_db
 from models import ImageRecord
 from services.llm_service import LLMService
+from services.storage import upload_bytes
 
 router = APIRouter()
-
-IMAGE_DIR = "data/images"
-
-os.makedirs(IMAGE_DIR, exist_ok=True)
 
 llm_service = LLMService()
 
@@ -20,30 +18,30 @@ llm_service = LLMService()
 @router.post("/upload_image")
 async def upload_image(
     plant_id: int = Form(...),
-    image_path: str = Form(...),
+    image: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    # Expect absolute path; copy into managed storage
-    if not os.path.isabs(image_path):
-        raise HTTPException(status_code=400, detail="image_path must be an absolute path")
-    if not os.path.exists(image_path):
-        raise HTTPException(status_code=400, detail="image_path does not exist")
+    contents = await image.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="empty file")
 
-    filename = f"{datetime.utcnow().timestamp()}_{os.path.basename(image_path)}"
-    filepath = os.path.join(IMAGE_DIR, filename)
+    ts = int(datetime.utcnow().timestamp())
+    ext = Path(image.filename).suffix or ".jpg"
+    storage_path = f"{plant_id}/{ts}{ext}"
 
-    with open(image_path, "rb") as src, open(filepath, "wb") as dst:
-        dst.write(src.read())
+    try:
+        public_url = upload_bytes(
+            SUPABASE_PLANT_BUCKET, storage_path, contents, image.content_type or "image/jpeg"
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"upload failed: {exc}") from exc
 
-    cv_result = llm_service.analyze_image(filepath)
+    cv_result = llm_service.analyze_image(public_url)
 
     record = ImageRecord(
         plant_id=plant_id,
-        file_path=filepath,
+        file_path=public_url,
         captured_at=datetime.utcnow(),
-        plant_type=cv_result.get("plant_type"),
-        leaf_health=cv_result.get("leaf_health"),
-        symptoms=cv_result.get("symptoms"),
     )
 
     db.add(record)
@@ -54,8 +52,6 @@ async def upload_image(
         "status": "ok",
         "plant_id": plant_id,
         "image_id": record.id,
-        "plant_type": record.plant_type,
-        "leaf_health": record.leaf_health,
-        "symptoms": record.symptoms,
-        "file_path": filepath,
+        "file_path": public_url,
+        "vision_result": cv_result,
     }

@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from typing import Dict, Any
 
@@ -37,32 +36,15 @@ class LLMService:
             "symptoms": [],
         }
 
-    def generate_dream_image(self, plant_id: int, sensor_payload: Dict[str, Any]) -> Dict[str, str]:
+    def generate_dream_image(self, plant_id: int, sensor_payload: Dict[str, Any]) -> Dict[str, Any]:
         """Mock dream garden image generation based on sensor snapshot."""
-        dream_dir = os.path.join("data", "dreams")
-        os.makedirs(dream_dir, exist_ok=True)
-
-        ts = datetime.utcnow().timestamp()
-        filename = f"dream_{plant_id}_{int(ts)}.png"
-        file_path = os.path.join(dream_dir, filename)
-
         # 1x1 transparent PNG bytes
         png_bytes = (
             b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
             b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0bIDAT\x08\xd7c```"
             b"\x00\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
         )
-        with open(file_path, "wb") as f:
-            f.write(png_bytes)
-
-        prompt_parts = [
-            "Dream garden visualization",
-            f"plant_id={plant_id}",
-            f"temperature={sensor_payload.get('temperature')}",
-            f"light={sensor_payload.get('light')}",
-            f"soil_moisture={sensor_payload.get('soil_moisture')}",
-            f"health_status={sensor_payload.get('health_status')}",
-        ]
-        prompt = "; ".join([p for p in prompt_parts if p is not None])
-
-        return {"file_path": file_path, "prompt": prompt}
+        return {
+            "data": png_bytes,
+            "ext": "png",
+        }
