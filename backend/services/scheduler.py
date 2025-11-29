@@ -139,7 +139,7 @@ def _run_single_analysis_and_optionals(
                 DreamImageRecord(
                     plant_id=plant_id,
                     file_path=public_url or storage_path,
-                    info=analysis_payload,
+                    description=None,
                     created_at=datetime.utcnow(),
                 )
             )
