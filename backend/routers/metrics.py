@@ -11,6 +11,7 @@ from models import SensorRecord, WeightRecord
 router = APIRouter()
 
 LIGHT_SAMPLE_INTERVAL_MIN = 10.0  # assumed sampling interval for light aggregation
+SOIL_SCALE = 255.0  # raw scale: 0 wet, 255 dry
 
 
 def _latest_value(db: Session, plant_id: int, column):
@@ -87,6 +88,13 @@ def _last_watering(db: Session, plant_id: int) -> Optional[datetime]:
     return None
 
 
+def _soil_pct(raw: Optional[float]) -> Optional[float]:
+    if raw is None:
+        return None
+    pct = (SOIL_SCALE - raw) / SOIL_SCALE * 100.0
+    return round(max(0.0, min(100.0, pct)), 2)
+
+
 @router.get("/metrics/{plant_id}")
 def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     now = datetime.utcnow()
@@ -105,7 +113,7 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     soil_24h_before = _value_at_or_before(db, plant_id, SensorRecord.soil_moisture, now - timedelta(hours=24))
     soil_trend = None
     if soil_now is not None and soil_24h_before is not None:
-        soil_trend = soil_now - soil_24h_before
+        soil_trend = _soil_pct(soil_now) - _soil_pct(soil_24h_before)
 
     # Light (lux)
     light_now = _latest_value(db, plant_id, SensorRecord.light)
@@ -161,9 +169,9 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
             "temp_24h_max": temp_24h_max,
         },
         "soil_moisture": {
-            "soil_now": soil_now,
-            "soil_24h_min": soil_24h_min,
-            "soil_24h_max": soil_24h_max,
+            "soil_now": _soil_pct(soil_now),
+            "soil_24h_min": _soil_pct(soil_24h_min),
+            "soil_24h_max": _soil_pct(soil_24h_max),
             "soil_24h_trend": soil_trend,
         },
         "light": {
@@ -224,8 +232,9 @@ def get_metrics_daily_7d(plant_id: int, db: Session = Depends(get_db)) -> Dict[s
         .all()
     )
 
-    def _avg(seq, idx):
-        vals = [x[idx] for x in seq if x[idx] is not None]
+    def _avg(seq, idx, convert=None):
+        vals = [convert(x[idx]) if convert else x[idx] for x in seq if x[idx] is not None]
+        vals = [v for v in vals if v is not None]
         return sum(vals) / len(vals) if vals else None
 
     metrics = []
@@ -236,7 +245,7 @@ def get_metrics_daily_7d(plant_id: int, db: Session = Depends(get_db)) -> Dict[s
             {
                 "date": b_start.date().isoformat(),
                 "weight": _avg(w_filtered, 1),
-                "soil_moisture": _avg(s_filtered, 3),
+                "soil_moisture": _avg(s_filtered, 3, _soil_pct),
                 "temperature": _avg(s_filtered, 1),
                 "light": _avg(s_filtered, 2),
             }
@@ -285,8 +294,9 @@ def get_metrics_hourly_24h(plant_id: int, db: Session = Depends(get_db)) -> Dict
         .all()
     )
 
-    def _avg(seq, idx):
-        vals = [x[idx] for x in seq if x[idx] is not None]
+    def _avg(seq, idx, convert=None):
+        vals = [convert(x[idx]) if convert else x[idx] for x in seq if x[idx] is not None]
+        vals = [v for v in vals if v is not None]
         return sum(vals) / len(vals) if vals else None
 
     metrics = []
@@ -297,7 +307,7 @@ def get_metrics_hourly_24h(plant_id: int, db: Session = Depends(get_db)) -> Dict
             {
                 "hour": b_start.strftime("%Y-%m-%d %H:00"),
                 "weight": _avg(w_filtered, 1),
-                "soil_moisture": _avg(s_filtered, 3),
+                "soil_moisture": _avg(s_filtered, 3, _soil_pct),
                 "temperature": _avg(s_filtered, 1),
                 "light": _avg(s_filtered, 2),
             }
