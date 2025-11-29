@@ -93,8 +93,6 @@ def _run_single_analysis_and_optionals(
         "sensor_summary_7d": sensor_summary_7d,
         "stress_factors": growth_result.get("stress_factors", []),
     }
-    leaf_health = None
-    symptoms = None
 
     # Optionally generate LLM text report
     llm_short = None
@@ -109,11 +107,10 @@ def _run_single_analysis_and_optionals(
         plant_id=plant_id,
         growth_status=analysis_payload["growth_status"],
         growth_rate_3d=analysis_payload["growth_rate_3d"],
-        stress_factors=analysis_payload["stress_factors"],
-        leaf_health=leaf_health,
-        symptoms=symptoms,
-        llm_report_short=llm_short,
-        llm_report_long=llm_long,
+        growth_overview=llm_short,
+        environment_assessment=None,
+        suggestions=None,
+        full_analysis=llm_long,
         created_at=datetime.utcnow(),
     )
     db.add(analysis_record)
