@@ -1,11 +1,12 @@
 import requests
 from typing import Optional
 
+from pathlib import Path
+
 from config import BASE_URL, TIMEOUT, MAX_RETRIES
 from utils import log
 
 session = requests.Session()
-session.headers.update({"Content-Type": "application/json"})
 
 
 def get_plant_id_by_nickname(nickname: str) -> Optional[int]:
@@ -51,10 +52,24 @@ def upload_sensor_and_weight(plant_id: int, temp, light, soil, weight):
     return r1, r2
 
 
-def upload_image_path(plant_id: int, photo_path: str):
+def upload_image_file(plant_id: int, photo_path: str):
+    """
+    Upload a local image file to backend /upload_image (multipart form-data).
+    The backend now uploads to Supabase Storage and stores the public URL.
+    """
     url = f"{BASE_URL}/upload_image"
-    files = {
-        "plant_id": (None, str(plant_id)),
-        "image_path": (None, photo_path),
-    }
-    return requests.post(url, files=files, timeout=TIMEOUT)
+    path_obj = Path(photo_path)
+    if not path_obj.exists():
+        log(f"[upload_image] file not found: {photo_path}")
+        return None
+
+    with path_obj.open("rb") as f:
+        files = {
+            "plant_id": (None, str(plant_id)),
+            "image": (path_obj.name, f, "image/jpeg"),
+        }
+        try:
+            return requests.post(url, files=files, timeout=TIMEOUT)
+        except Exception as e:  # pragma: no cover
+            log(f"[upload_image] request failed: {e}")
+            return None
