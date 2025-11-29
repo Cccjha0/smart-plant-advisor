@@ -251,6 +251,23 @@ def get_growth_analytics(plant_id: int, days: int = 7, db: Session = Depends(get
     # Growth rate 3d series: reuse reference points to compute rolling 3-day slope
     growth_rate_series = []
     ref_sorted = sorted(ref_points, key=lambda p: p["date"])
+    try:
+        g_norm = growth_analyzer.MIN_NORMAL_GROWTH
+        g_slow = growth_analyzer.MIN_SLOW_GROWTH
+    except Exception:
+        g_norm, g_slow = 0.2, 0.05
+
+    def _rate_to_score(rate: Optional[float]) -> float:
+        if rate is None:
+            return 5.0
+        if rate <= 0:
+            return 9.0
+        if rate < g_slow:
+            return 7.0
+        if rate < g_norm:
+            return 5.0
+        return 1.0
+
     for idx in range(len(ref_sorted)):
         window = ref_sorted[max(0, idx - 2): idx + 1]
         if len(window) >= 2:
@@ -272,19 +289,69 @@ def get_growth_analytics(plant_id: int, days: int = 7, db: Session = Depends(get
                 }
             )
 
-    # Stress scores: derive from latest analysis debug (24h averages)
+    # Stress scores: numeric scores based on 24h averages + growth rate
     analysis = growth_analyzer.analyze_growth(plant_id, db)
-    stress_factors = set(analysis.get("stress_factors") or [])
+    debug = analysis.get("debug") or {}
+    sensor_24h = debug.get("sensor_24h") or {}
+    avg_temp = sensor_24h.get("avg_temperature")
+    avg_light = sensor_24h.get("avg_light")
+    avg_soil_norm = sensor_24h.get("avg_soil_moisture")  # normalized 0-1
+    growth_rate_3d = analysis.get("growth_rate_3d")
 
-    def score_for(name: str) -> float:
-        # Simple mapping: present -> 7/10, absent -> 1/10
-        return 7.0 if name in stress_factors else 1.0
+    try:
+        ideal_light = growth_analyzer.LIGHT_OPT_MIN
+    except Exception:
+        ideal_light = 200.0
+
+    try:
+        t_low = growth_analyzer.TEMP_OPT_LOW
+        t_high = growth_analyzer.TEMP_OPT_HIGH
+    except Exception:
+        t_low, t_high = 18.0, 30.0
+
+    try:
+        s_low = growth_analyzer.SOIL_MOIST_LOW
+        s_high = growth_analyzer.SOIL_MOIST_HIGH
+    except Exception:
+        s_low, s_high = 0.25, 0.75
+
+    # Light score: 1 when >= ideal, scale to 10 as it approaches 0
+    if avg_light is not None:
+        if avg_light >= ideal_light:
+            light_score = 1.0
+        else:
+            light_score = min(10.0, max(1.0, 10.0 * (1 - (avg_light / ideal_light))))
+    else:
+        light_score = 5.0
+
+    # Temperature score: 1 inside band; +1 per deg outside, capped 10
+    if avg_temp is not None:
+        if t_low <= avg_temp <= t_high:
+            temp_score = 1.0
+        else:
+            dist = min(abs(avg_temp - t_low), abs(avg_temp - t_high))
+            temp_score = min(10.0, 1.0 + dist)
+    else:
+        temp_score = 5.0
+
+    # Soil score: 1 inside window; linear penalty outside
+    if avg_soil_norm is not None:
+        if s_low <= avg_soil_norm <= s_high:
+            soil_score = 1.0
+        elif avg_soil_norm < s_low:
+            soil_score = min(10.0, 1.0 + (s_low - avg_soil_norm) * 20)
+        else:
+            soil_score = min(10.0, 1.0 + (avg_soil_norm - s_high) * 20)
+    else:
+        soil_score = 5.0
+
+    growth_score = _rate_to_score(growth_rate_3d)
 
     stress_scores = {
-        "temperature": score_for("temp_out_of_range"),
-        "humidity": score_for("humidity"),  # placeholder if humidity stress added
-        "light": score_for("low_light"),
-        "growth": score_for("growth"),  # placeholder, not in factors; kept for UI slot
+        "temperature": round(temp_score, 2),
+        "humidity": round(soil_score, 2),
+        "light": round(light_score, 2),
+        "growth": round(growth_score, 2),
     }
 
     return {
