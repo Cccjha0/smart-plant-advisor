@@ -16,6 +16,7 @@ export function PhotosTab({ plantId }: { plantId: number }) {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadedIds, setLoadedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const load = async () => {
@@ -28,6 +29,14 @@ export function PhotosTab({ plantId }: { plantId: number }) {
     };
     load();
   }, [plantId]);
+
+  const handleImageLoad = (id: number) => {
+    setLoadedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -51,10 +60,20 @@ export function PhotosTab({ plantId }: { plantId: number }) {
                 onClick={() => setSelectedPhoto(photo)}
                 className="cursor-pointer group"
               >
-                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-2">
-                  <div className="w-full h-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <ImageIcon className="w-12 h-12 text-gray-400" />
-                  </div>
+                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-2 relative">
+                  {!loadedIds.has(photo.id) && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                    </div>
+                  )}
+                  <img
+                    src={photo.file_path}
+                    alt={photo.plant_type || 'photo'}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    onLoad={() => handleImageLoad(photo.id)}
+                    onError={() => handleImageLoad(photo.id)}
+                  />
                 </div>
                 <p className="text-xs text-gray-600">{new Date(photo.captured_at).toLocaleString()}</p>
                 <p className="text-xs text-gray-500 line-clamp-2">{photo.plant_type || '未知类型'}</p>
@@ -78,8 +97,12 @@ export function PhotosTab({ plantId }: { plantId: number }) {
             </div>
 
             <div className="p-6">
-              <div className="aspect-video bg-gray-100 rounded-lg mb-6 flex items-center justify-center">
-                <ImageIcon className="w-24 h-24 text-gray-400" />
+              <div className="aspect-video bg-gray-100 rounded-lg mb-6 flex items-center justify-center overflow-hidden">
+                <img
+                  src={selectedPhoto.file_path}
+                  alt={selectedPhoto.plant_type || 'photo'}
+                  className="w-full h-full object-cover"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-6 mb-6">
