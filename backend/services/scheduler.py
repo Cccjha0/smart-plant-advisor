@@ -10,6 +10,7 @@ from models import (
     AnalysisResult,
     DreamImageRecord,
     Plant,
+    Alert,
     SchedulerJob,
     SchedulerJobRun,
     SensorRecord,
@@ -144,15 +145,20 @@ def _run_single_analysis_and_optionals(
 
     llm_short = None
     llm_long = None
+    plant_type = None
+    alert_msg = None
     if include_llm:
         llm_output = llm_service.generate(analysis_payload)
-        llm_short = llm_output.get("short_report")
-        llm_long = llm_output.get("long_report")
+        llm_short = llm_output.get("growth_overview") or llm_output.get("short_report")
+        llm_long = llm_output.get("full_analysis") or llm_output.get("long_report")
+        plant_type = llm_output.get("plant_type")
+        alert_msg = llm_output.get("alert")
 
     analysis_record = AnalysisResult(
         plant_id=plant_id,
         growth_status=analysis_payload["growth_status"],
         growth_rate_3d=analysis_payload["growth_rate_3d"],
+        plant_type=plant_type,
         growth_overview=llm_short,
         environment_assessment=None,
         suggestions=None,
@@ -161,6 +167,21 @@ def _run_single_analysis_and_optionals(
     )
     db.add(analysis_record)
     db.flush()
+
+    # If plant species is empty and LLM provided plant_type, update species
+    if plant_type and (plant.species is None or plant.species == ""):
+        plant.species = plant_type
+
+    # If alert exists, store it
+    if alert_msg:
+        db.add(
+            Alert(
+                plant_id=plant_id,
+                analysis_result_id=analysis_record.id,
+                message=alert_msg,
+                created_at=datetime.utcnow(),
+            )
+        )
 
     if include_dream:
         dream_result = llm_service.generate_dream_image(plant_id, analysis_payload)

@@ -10,5 +10,6 @@ class Alert(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     plant_id = Column(Integer, ForeignKey("plants.id"), nullable=True, index=True)
+    analysis_result_id = Column(Integer, ForeignKey("analysis_results.id"), nullable=True)
     message = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
