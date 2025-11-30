@@ -138,6 +138,18 @@ export function DreamGallery() {
                   <Sparkles className="w-32 h-32 text-purple-400" />
                 </div>
 
+                <div className="mb-6">
+                  <p className="text-sm text-gray-500 mb-2">生成时环境快照</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {['温度', '湿度', '光照', '重量'].map((label) => (
+                      <div key={label} className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-500 mb-1">{label}</p>
+                        <p className="text-xl text-gray-900">暂无数据</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                   <h3 className="text-gray-900 mb-2">完整梦境描述</h3>
                   <p className="text-gray-700 leading-relaxed">{selectedDream.description || '暂无描述'}</p>
