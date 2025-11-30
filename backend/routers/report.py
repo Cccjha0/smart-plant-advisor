@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ImageRecord, SensorRecord, AnalysisResult, Plant, Alert
+from models import ImageRecord, SensorRecord, AnalysisResult, Plant, Alert, DreamImageRecord
 from services.growth_service import GrowthService
 from services.llm_service import LLMService
 
@@ -91,6 +91,23 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
         )
 
     db.add(result)
+    db.flush()
+
+    # Update plant species if empty and plant_type is provided
+    if plant and plant_type and (plant.species is None or plant.species == ""):
+        plant.species = plant_type
+
+    # Write alert if provided
+    if alert_msg:
+        db.add(
+            Alert(
+                plant_id=plant_id,
+                analysis_result_id=result.id,
+                message=alert_msg,
+                created_at=datetime.utcnow(),
+            )
+        )
+
     db.commit()
     db.refresh(result)
 

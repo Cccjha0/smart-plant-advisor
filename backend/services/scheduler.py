@@ -204,8 +204,16 @@ def _run_single_analysis_and_optionals(
             db.add(
                 DreamImageRecord(
                     plant_id=plant_id,
+                    analysis_result_id=analysis_record.id,
                     file_path=public_url or storage_path,
-                    description=None,
+                    description=dream_result.get("description"),
+                    context={
+                        "temperature": analysis_payload.get("sensor_summary_7d", {}).get("avg_temperature"),
+                        "light": analysis_payload.get("sensor_summary_7d", {}).get("avg_light"),
+                        "soil_moisture": analysis_payload.get("sensor_summary_7d", {}).get("avg_soil_moisture"),
+                        "growth_status": analysis_payload.get("growth_status"),
+                        "growth_rate_3d": analysis_payload.get("growth_rate_3d"),
+                    },
                     created_at=datetime.utcnow(),
                 )
             )
