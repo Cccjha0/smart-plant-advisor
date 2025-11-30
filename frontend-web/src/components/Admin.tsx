@@ -62,13 +62,21 @@ export function Admin() {
   const overviewCards = useMemo(() => {
     const src = sysOverview || stats;
     if (!src) return [];
-    return [
+    const colors = [
+      { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', value: 'text-green-900' },
+      { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', value: 'text-blue-900' },
+      { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', value: 'text-purple-900' },
+      { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', value: 'text-orange-900' },
+      { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-700', value: 'text-pink-900' },
+    ];
+    const entries = [
       { label: '总植物数', value: src.total_plants },
       { label: '图像总数', value: src.total_images },
       { label: '传感器记录', value: src.total_sensor_records },
       { label: '分析结果', value: src.total_analysis_results },
       { label: '梦境图总数', value: (src as any).total_dream_images ?? '—' },
     ];
+    return entries.map((e, idx) => ({ ...e, color: colors[idx % colors.length] }));
   }, [stats, sysOverview]);
 
   return (
@@ -84,9 +92,12 @@ export function Admin() {
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-8">
             {overviewCards.map((card, idx) => (
-              <div key={idx} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <p className="text-sm text-gray-700 mb-1">{card.label}</p>
-                <p className="text-3xl text-gray-900">{card.value ?? '—'}</p>
+              <div
+                key={idx}
+                className={`p-4 rounded-lg border ${card.color?.bg || 'bg-gray-50'} ${card.color?.border || 'border-gray-200'}`}
+              >
+                <p className={`text-sm mb-1 ${card.color?.text || 'text-gray-700'}`}>{card.label}</p>
+                <p className={`text-3xl ${card.color?.value || 'text-gray-900'}`}>{card.value ?? '—'}</p>
               </div>
             ))}
           </div>
