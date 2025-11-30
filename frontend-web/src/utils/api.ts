@@ -152,6 +152,7 @@ export const api = {
   getAnalysis: (plantId: number) => fetchJson<AnalysisDto>(`/analysis/${plantId}`),
   getReport: (plantId: number) => fetchJson<any>(`/report/${plantId}`),
   getGrowthAnalytics: (plantId: number) => fetchJson<GrowthAnalysisDto>(`/plants/${plantId}/growth-analytics?days=7`),
+  getImagesByPlant: (plantId: number, limit = 50) => fetchJson<any[]>(`/images?plant_id=${plantId}&limit=${limit}`),
   getAdminStats: () => fetchJson<any>('/admin/stats'),
   getSchedulerJobs: () => fetchJson<SchedulerJobDto[]>('/scheduler/jobs'),
   getSchedulerLogs: (limit = 50) => fetchJson<SchedulerLogDto[]>(`/scheduler/logs?limit=${limit}`),

@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Image as ImageIcon, X } from 'lucide-react';
-import { api, DreamDto } from '../../utils/api';
+import { api } from '../../utils/api';
+
+type PhotoItem = {
+  id: number;
+  plant_id: number;
+  file_path: string;
+  captured_at: string;
+  plant_type?: string | null;
+  leaf_health?: string | null;
+  symptoms?: any;
+};
 
 export function PhotosTab({ plantId }: { plantId: number }) {
-  const [selectedPhoto, setSelectedPhoto] = useState<DreamDto | null>(null);
-  const [photos, setPhotos] = useState<DreamDto[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        // 暂无独立 images 列表接口，先复用 dream images 作为占位
-        const list = await api.getDreamsByPlant(plantId).catch(() => []);
+        const list = await api.getImagesByPlant(plantId).catch(() => []);
         setPhotos(list || []);
       } finally {
         setLoading(false);
@@ -33,7 +42,6 @@ export function PhotosTab({ plantId }: { plantId: number }) {
           <div className="text-center py-12">
             <ImageIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">暂无照片</p>
-            <p className="text-sm text-gray-400 mt-1">后端无 images 列表接口，暂用梦境图占位</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -48,8 +56,8 @@ export function PhotosTab({ plantId }: { plantId: number }) {
                     <ImageIcon className="w-12 h-12 text-gray-400" />
                   </div>
                 </div>
-                <p className="text-xs text-gray-600">{new Date(photo.created_at).toLocaleString()}</p>
-                <p className="text-xs text-gray-500 line-clamp-2">{photo.description || '暂无描述'}</p>
+                <p className="text-xs text-gray-600">{new Date(photo.captured_at).toLocaleString()}</p>
+                <p className="text-xs text-gray-500 line-clamp-2">{photo.plant_type || '未知类型'}</p>
               </div>
             ))}
           </div>
@@ -77,7 +85,7 @@ export function PhotosTab({ plantId }: { plantId: number }) {
               <div className="grid grid-cols-2 gap-6 mb-6">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">拍摄时间</p>
-                  <p className="text-gray-900 text-sm">{new Date(selectedPhoto.created_at).toLocaleString()}</p>
+                  <p className="text-gray-900 text-sm">{new Date(selectedPhoto.captured_at).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">文件路径</p>
@@ -86,8 +94,10 @@ export function PhotosTab({ plantId }: { plantId: number }) {
               </div>
 
               <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-gray-900 mb-2">描述</h3>
-                <p className="text-gray-700 leading-relaxed">{selectedPhoto.description || '暂无描述'}</p>
+                <h3 className="text-gray-900 mb-2">视觉分析摘要</h3>
+                <p className="text-gray-700 leading-relaxed">
+                  {selectedPhoto.leaf_health || '暂无摘要'}
+                </p>
               </div>
             </div>
           </div>
