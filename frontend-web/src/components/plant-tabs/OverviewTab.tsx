@@ -1,17 +1,29 @@
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Droplets, Thermometer, Sun, Weight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { mockMetricsData } from '../../utils/mockData';
-
-interface Plant {
-  id: string;
-  nickname: string;
-  species: string;
-  status: string;
-  createdAt: string;
-  lastWatering: string;
-}
+import { api, AnalysisDto, DailyMetric, Plant } from '../../utils/api';
 
 export function OverviewTab({ plant }: { plant: Plant }) {
+  const [analysis, setAnalysis] = useState<AnalysisDto | null>(null);
+  const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [a, m] = await Promise.all([
+          api.getAnalysis(plant.id).catch(() => null),
+          api.getMetricsDaily7d(plant.id).catch(() => ({ metrics: [] })),
+        ]);
+        setAnalysis(a);
+        setDailyMetrics(m.metrics || []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [plant.id]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':
@@ -43,13 +55,32 @@ export function OverviewTab({ plant }: { plant: Plant }) {
       case 'healthy':
         return '植物生长状态良好，各项指标正常。继续保持当前的养护节奏。';
       case 'slightly_stressed':
-        return '植物处于轻微压力状态，建议检查土壤湿度和光照条件。可能需要适当调整浇水频率。';
+        return '植物处于轻微压力状态，建议检查土壤湿度和光照条件，适当调整浇水频率。';
       case 'stressed':
-        return '植物处于较大压力状态，需要立即检查。建议检查根系健康、土壤状态和环境因素。';
+        return '植物处于较大压力，需要立即检查根系健康、土壤状态和环境因素。';
       default:
         return '近期数据不足，无法做出准确评估。请确保传感器正常工作。';
     }
   };
+
+  const lineDataWeight = useMemo(
+    () => dailyMetrics.map((m) => ({ time: m.date, value: m.weight })),
+    [dailyMetrics]
+  );
+  const lineDataMoisture = useMemo(
+    () => dailyMetrics.map((m) => ({ time: m.date, value: m.soil_moisture })),
+    [dailyMetrics]
+  );
+  const lineDataTemp = useMemo(
+    () => dailyMetrics.map((m) => ({ time: m.date, value: m.temperature })),
+    [dailyMetrics]
+  );
+  const lineDataLight = useMemo(
+    () => dailyMetrics.map((m) => ({ time: m.date, value: m.light })),
+    [dailyMetrics]
+  );
+
+  const status = analysis?.growth_status || 'unknown';
 
   return (
     <div className="space-y-6">
@@ -59,19 +90,19 @@ export function OverviewTab({ plant }: { plant: Plant }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div>
             <p className="text-sm text-gray-500 mb-1">植物昵称</p>
-            <p className="text-gray-900">{plant.nickname}</p>
+            <p className="text-gray-900">{plant.nickname || '未命名'}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500 mb-1">植物种类</p>
-            <p className="text-gray-900">{plant.species}</p>
+            <p className="text-gray-900">{plant.species || '未填写种类'}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500 mb-1">创建时间</p>
-            <p className="text-gray-900">{plant.createdAt}</p>
+            <p className="text-gray-900">—</p>
           </div>
           <div>
             <p className="text-sm text-gray-500 mb-1">最近浇水</p>
-            <p className="text-gray-900">{plant.lastWatering}</p>
+            <p className="text-gray-900">—</p>
           </div>
         </div>
       </div>
@@ -85,12 +116,12 @@ export function OverviewTab({ plant }: { plant: Plant }) {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <span className="text-gray-700">状态评估：</span>
-              <span className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(plant.status)}`}>
-                {getStatusText(plant.status)}
+              <span className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(status)}`}>
+                {getStatusText(status)}
               </span>
             </div>
             <p className="text-gray-600 leading-relaxed">
-              {getStatusMessage(plant.status)}
+              {getStatusMessage(status)}
             </p>
           </div>
         </div>
@@ -98,8 +129,8 @@ export function OverviewTab({ plant }: { plant: Plant }) {
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-900 mb-2">💡 今日建议</p>
           <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-            <li>保持当前的浇水节奏，每3-4天浇水一次</li>
-            <li>确保植物接收充足的散射光，避免强光直射</li>
+            <li>保持当前的浇水节奏，每 3-4 天浇水一次</li>
+            <li>确保植物接受充足的散射光，避免强光直射</li>
             <li>定期检查土壤湿度，保持适度湿润</li>
           </ul>
         </div>
@@ -117,7 +148,7 @@ export function OverviewTab({ plant }: { plant: Plant }) {
               <h3 className="text-gray-900">重量趋势</h3>
             </div>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={mockMetricsData.weight}>
+              <LineChart data={lineDataWeight}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
@@ -134,7 +165,7 @@ export function OverviewTab({ plant }: { plant: Plant }) {
               <h3 className="text-gray-900">土壤湿度</h3>
             </div>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={mockMetricsData.moisture}>
+              <LineChart data={lineDataMoisture}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
@@ -151,7 +182,7 @@ export function OverviewTab({ plant }: { plant: Plant }) {
               <h3 className="text-gray-900">温度变化</h3>
             </div>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={mockMetricsData.temperature}>
+              <LineChart data={lineDataTemp}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
@@ -168,7 +199,7 @@ export function OverviewTab({ plant }: { plant: Plant }) {
               <h3 className="text-gray-900">光照强度</h3>
             </div>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={mockMetricsData.light}>
+              <LineChart data={lineDataLight}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
