@@ -14,6 +14,7 @@ class AnalysisResult(Base):
 
     growth_status = Column(String, nullable=True)
     growth_rate_3d = Column(Float, nullable=True)
+    plant_type = Column(String, nullable=True)
     growth_overview = Column(String, nullable=True)
     environment_assessment = Column(String, nullable=True)
     suggestions = Column(String, nullable=True)

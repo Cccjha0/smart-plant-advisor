@@ -32,10 +32,12 @@ class LLMService:
         )
 
         return {
+            "plant_type": plant_type,
             "growth_overview": growth_overview,
             "environment_assessment": environment_assessment,
             "suggestions": suggestions,
             "full_analysis": full_analysis,
+            "alert": None,
         }
 
     def analyze_image(self, image_url: str, sensor_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -64,6 +66,7 @@ class LLMService:
             "environment_assessment": None,
             "suggestions": None,
             "full_analysis": None,
+            "alert": None,
         }
 
     def generate_dream_image(self, plant_id: int, sensor_payload: Dict[str, Any]) -> Dict[str, Any]:

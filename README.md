@@ -20,21 +20,24 @@ Frontend: React (Vite) + Tailwind + shadcn/ui (`frontend-web/`)
 - Images: `POST /upload_image` (multipart file → Supabase Storage, stores public URL)
 - Analysis/Report: `GET /analysis/{id}`, `GET /report/{id}` (persists AnalysisResult text fields)
 - Dreams: `POST /dreams`, `GET /dreams/{plant_id}` (Supabase Storage URLs)
-- Alerts: `GET/POST /alerts`, `DELETE /alerts/{id}`
+- Alerts: `GET/POST /alerts`, `DELETE /alerts/{id}` (supports `plant_id`, `analysis_result_id`)
+- Scheduler control: `GET /scheduler/jobs`, `POST /scheduler/jobs/{id}/pause|resume|run-now`, `GET /scheduler/logs`
 - System stats: `GET /admin/stats`, `GET /system/overview`, `GET /dashboard/system-overview`
 - Dashboard data: `GET /metrics/{plant_id}` (live), plus the above analytics and overview endpoints.
 
 ## Data Model Highlights
-- `AnalysisResult`: `growth_status`, `growth_rate_3d`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis` (removed: leaf_health, symptoms, stress_factors, llm_report_*).
+- `AnalysisResult`: `growth_status`, `growth_rate_3d`, `plant_type`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis`.
 - `DreamImage`: `file_path`, `description`, `created_at` (removed: info).
-- `Alert`: `id`, `message`, `created_at`.
+- `Alert`: `id`, `plant_id`, `analysis_result_id`, `message`, `created_at`.
+- Scheduler tables: `scheduler_jobs`, `scheduler_job_runs` (job metadata + run history).
 - Images store Supabase public URLs (no local paths).
 
 ## Scheduler (`services/scheduler.py`)
 - Daily analysis for plants with data in last 24h.
-- Every 6h: analysis + LLM report + dream image (if recent data).
+- Every 6h: split jobs for LLM report and dream image; startup also triggers one full LLM+Dream run.
+- Weekly cleanup: removes sensor/weight data older than 30 days.
 - Post-watering one-off full pipeline (1h delay) when invoked.
-- Startup triggers one immediate full pipeline run.
+- Scheduler jobs are synced into DB and can be paused/resumed/run-now via API; runs are logged in `scheduler_job_runs`.
 
 ## Supabase Storage
 - Buckets: `plant-images` (original photos), `dream-images` (dream garden).
