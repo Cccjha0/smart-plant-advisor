@@ -6,6 +6,7 @@ from .analysis_results import AnalysisResult
 from .dream_images import DreamImageRecord
 from .alerts import Alert
 from .scheduler_jobs import SchedulerJob
+from .scheduler_job_runs import SchedulerJobRun
 
 __all__ = [
     "Plant",
@@ -16,4 +17,5 @@ __all__ = [
     "DreamImageRecord",
     "Alert",
     "SchedulerJob",
+    "SchedulerJobRun",
 ]

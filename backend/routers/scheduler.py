@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from database import SessionLocal
-from models import SchedulerJob
+from models import SchedulerJob, SchedulerJobRun
 from services.scheduler import (
     get_scheduler_jobs_snapshot,
     pause_job,
@@ -86,3 +86,33 @@ def run_scheduler_job_now(job_id: int):
     run_job_now(job.job_key)
     updated = _get_job_or_404(job_id)
     return {"status": "triggered", "job": _build_response(updated)}
+
+
+@router.get("/scheduler/logs")
+def list_scheduler_logs(limit: int = 50):
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(SchedulerJobRun, SchedulerJob)
+            .outerjoin(SchedulerJob, SchedulerJobRun.job_id == SchedulerJob.id)
+            .order_by(SchedulerJobRun.id.desc())
+            .limit(limit)
+            .all()
+        )
+        results = []
+        for run, job in rows:
+            results.append(
+                {
+                    "id": run.id,
+                    "jobKey": run.job_key,
+                    "jobName": job.name if job else None,
+                    "status": run.status,
+                    "message": run.message,
+                    "startedAt": run.started_at.isoformat() if run.started_at else None,
+                    "finishedAt": run.finished_at.isoformat() if run.finished_at else None,
+                    "durationSeconds": run.duration_seconds,
+                }
+            )
+        return results
+    finally:
+        db.close()
