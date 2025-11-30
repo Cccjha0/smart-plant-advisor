@@ -44,6 +44,13 @@ JOB_METADATA = {
     },
 }
 
+JOB_FN_MAP = {
+    "daily_analysis": run_daily_analysis,
+    "periodic_llm_report": run_periodic_llm_report,
+    "periodic_dream_image": run_periodic_dream_image,
+    "weekly_data_cleanup": run_weekly_data_cleanup,
+}
+
 
 def _get_last_data_timestamp(db, plant_id: int) -> datetime | None:
     """
@@ -412,6 +419,35 @@ def get_scheduler_jobs_snapshot():
         return db.query(SchedulerJob).all()
     finally:
         db.close()
+
+
+def pause_job(job_key: str):
+    try:
+        scheduler.pause_job(job_key)
+    except Exception:
+        pass
+    _sync_jobs_table()
+
+
+def resume_job(job_key: str):
+    try:
+        scheduler.resume_job(job_key)
+    except Exception:
+        pass
+    _sync_jobs_table()
+
+
+def run_job_now(job_key: str):
+    """
+    Trigger a job immediately (runs in current process).
+    """
+    fn = JOB_FN_MAP.get(job_key)
+    if fn:
+        try:
+            fn()
+        except Exception:
+            pass
+    _sync_jobs_table()
 
 
 def start_scheduler():
