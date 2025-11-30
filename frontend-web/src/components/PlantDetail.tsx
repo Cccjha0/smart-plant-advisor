@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Leaf } from 'lucide-react';
 import { OverviewTab } from './plant-tabs/OverviewTab';
@@ -6,14 +6,38 @@ import { MetricsTab } from './plant-tabs/MetricsTab';
 import { ReportsTab } from './plant-tabs/ReportsTab';
 import { PhotosTab } from './plant-tabs/PhotosTab';
 import { DreamTab } from './plant-tabs/DreamTab';
-import { mockPlants } from '../utils/mockData';
+import { api, Plant } from '../utils/api';
 
 export function PlantDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('overview');
+  const plantIdNum = Number(id);
+  const [plants, setPlants] = useState<Plant[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const plant = mockPlants.find((p) => p.id === id);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const list = await api.getPlants().catch(() => []);
+        setPlants(list || []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const plant = useMemo(() => plants.find((p) => p.id === plantIdNum), [plants, plantIdNum]);
+
+  if (loading) {
+    return (
+      <div className="p-8">
+        <div className="max-w-7xl mx-auto">
+          <p className="text-gray-500">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!plant) {
     return (
@@ -30,13 +54,14 @@ export function PlantDetail() {
     { id: 'metrics', label: '实时数据' },
     { id: 'reports', label: '分析报告' },
     { id: 'photos', label: '照片' },
-    { id: 'dreams', label: '梦境花园' }
+    { id: 'dreams', label: '梦境花园' },
   ];
+
+  const [activeTab, setActiveTab] = useState('overview');
 
   return (
     <div className="p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-6">
           <button
             onClick={() => navigate('/dashboard')}
@@ -51,13 +76,12 @@ export function PlantDetail() {
               <Leaf className="w-8 h-8 text-green-600" />
             </div>
             <div>
-              <h1 className="text-gray-900">{plant.nickname}</h1>
-              <p className="text-gray-500">{plant.species}</p>
+              <h1 className="text-gray-900">{plant.nickname || '未命名'}</h1>
+              <p className="text-gray-500">{plant.species || '未填写种类'}</p>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="border-b border-gray-200 mb-6">
           <nav className="flex gap-8">
             {tabs.map((tab) => (
@@ -76,13 +100,12 @@ export function PlantDetail() {
           </nav>
         </div>
 
-        {/* Tab Content */}
         <div>
           {activeTab === 'overview' && <OverviewTab plant={plant} />}
           {activeTab === 'metrics' && <MetricsTab plantId={plant.id} />}
           {activeTab === 'reports' && <ReportsTab plantId={plant.id} />}
           {activeTab === 'photos' && <PhotosTab plantId={plant.id} />}
-          {activeTab === 'dreams' && <DreamTab plantId={plant.id} plantName={plant.nickname} />}
+          {activeTab === 'dreams' && <DreamTab plantId={plant.id} plantName={plant.nickname || `Plant #${plant.id}`} />}
         </div>
       </div>
     </div>

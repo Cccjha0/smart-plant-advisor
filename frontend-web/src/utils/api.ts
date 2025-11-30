@@ -83,6 +83,30 @@ export type AnalysisDto = {
   };
 };
 
+export type DailyMetric = {
+  date: string;
+  weight: number | null;
+  soil_moisture: number | null;
+  temperature: number | null;
+  light: number | null;
+};
+
+export type HourlyMetric = {
+  hour: string;
+  weight: number | null;
+  soil_moisture: number | null;
+  temperature: number | null;
+  light: number | null;
+};
+
+export type GrowthAnalysisDto = {
+  plant_id: number;
+  days: number;
+  daily_weight: { date: string; actual_weight: number | null; reference_weight: number | null }[];
+  growth_rate_3d: { date: string; growth_rate_pct: number | null }[];
+  stress_scores: Record<string, number>;
+};
+
 export type SchedulerJobDto = {
   id: string;
   name: string;
@@ -123,7 +147,11 @@ export const api = {
   getAlerts: (limit = 20) => fetchJson<AlertDto[]>(`/alerts?limit=${limit}`),
   getDreamsByPlant: (plantId: number) => fetchJson<DreamDto[]>(`/dreams/${plantId}`),
   getMetrics: (plantId: number) => fetchJson<MetricsDto>(`/metrics/${plantId}`),
+  getMetricsDaily7d: (plantId: number) => fetchJson<{ metrics: DailyMetric[] }>(`/metrics/${plantId}/daily-7d`),
+  getMetricsHourly24h: (plantId: number) => fetchJson<{ metrics: HourlyMetric[] }>(`/metrics/${plantId}/hourly-24h`),
   getAnalysis: (plantId: number) => fetchJson<AnalysisDto>(`/analysis/${plantId}`),
+  getReport: (plantId: number) => fetchJson<any>(`/report/${plantId}`),
+  getGrowthAnalytics: (plantId: number) => fetchJson<GrowthAnalysisDto>(`/plants/${plantId}/growth-analytics?days=7`),
   getAdminStats: () => fetchJson<any>('/admin/stats'),
   getSchedulerJobs: () => fetchJson<SchedulerJobDto[]>('/scheduler/jobs'),
   getSchedulerLogs: (limit = 50) => fetchJson<SchedulerLogDto[]>(`/scheduler/logs?limit=${limit}`),
