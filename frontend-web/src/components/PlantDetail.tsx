@@ -14,6 +14,7 @@ export function PlantDetail() {
   const plantIdNum = Number(id);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     const load = async () => {
@@ -28,6 +29,14 @@ export function PlantDetail() {
   }, []);
 
   const plant = useMemo(() => plants.find((p) => p.id === plantIdNum), [plants, plantIdNum]);
+
+  const tabs = [
+    { id: 'overview', label: '概览' },
+    { id: 'metrics', label: '实时数据' },
+    { id: 'reports', label: '分析报告' },
+    { id: 'photos', label: '照片' },
+    { id: 'dreams', label: '梦境花园' },
+  ];
 
   if (loading) {
     return (
@@ -48,16 +57,6 @@ export function PlantDetail() {
       </div>
     );
   }
-
-  const tabs = [
-    { id: 'overview', label: '概览' },
-    { id: 'metrics', label: '实时数据' },
-    { id: 'reports', label: '分析报告' },
-    { id: 'photos', label: '照片' },
-    { id: 'dreams', label: '梦境花园' },
-  ];
-
-  const [activeTab, setActiveTab] = useState('overview');
 
   return (
     <div className="p-8">
