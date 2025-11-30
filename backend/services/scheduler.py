@@ -174,14 +174,14 @@ def _run_single_analysis_and_optionals(
 
     # If alert exists, store it
     if alert_msg:
-        db.add(
-            Alert(
-                plant_id=plant_id,
-                analysis_result_id=analysis_record.id,
-                message=alert_msg,
-                created_at=datetime.utcnow(),
+            db.add(
+                Alert(
+                    plant_id=plant_id,
+                    analysis_result_id=analysis_record.id,
+                    message=alert_msg,
+                    created_at=datetime.utcnow(),
+                )
             )
-        )
 
     if include_dream:
         dream_result = llm_service.generate_dream_image(plant_id, analysis_payload)
@@ -204,16 +204,10 @@ def _run_single_analysis_and_optionals(
             db.add(
                 DreamImageRecord(
                     plant_id=plant_id,
-                    analysis_result_id=analysis_record.id,
+                    sensor_record_id=None,
+                    weight_record_id=None,
                     file_path=public_url or storage_path,
                     description=dream_result.get("description"),
-                    context={
-                        "temperature": analysis_payload.get("sensor_summary_7d", {}).get("avg_temperature"),
-                        "light": analysis_payload.get("sensor_summary_7d", {}).get("avg_light"),
-                        "soil_moisture": analysis_payload.get("sensor_summary_7d", {}).get("avg_soil_moisture"),
-                        "growth_status": analysis_payload.get("growth_status"),
-                        "growth_rate_3d": analysis_payload.get("growth_rate_3d"),
-                    },
                     created_at=datetime.utcnow(),
                 )
             )
