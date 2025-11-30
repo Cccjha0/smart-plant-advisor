@@ -15,6 +15,14 @@ export type DashboardOverview = {
   dreams_generated_today: number;
 };
 
+export type SystemOverview = {
+  total_plants: number;
+  total_images: number;
+  total_sensor_records: number;
+  total_analysis_results: number;
+  total_dream_images: number;
+};
+
 export type Plant = {
   id: number;
   nickname: string | null;
@@ -110,6 +118,7 @@ export const api = {
       };
     }
   },
+  getSystemOverview: () => fetchJson<SystemOverview>('/system/overview'),
   getPlants: () => fetchJson<Plant[]>('/plants'),
   getAlerts: (limit = 20) => fetchJson<AlertDto[]>(`/alerts?limit=${limit}`),
   getDreamsByPlant: (plantId: number) => fetchJson<DreamDto[]>(`/dreams/${plantId}`),
