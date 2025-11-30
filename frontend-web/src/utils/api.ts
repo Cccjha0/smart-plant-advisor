@@ -106,7 +106,7 @@ export const api = {
         total_plants: sys.total_plants ?? 0,
         active_last_24h: sys.total_plants ?? 0,
         abnormal_plants: 0,
-        dreams_generated_today: sys.total_dream_images ?? 0,
+        dreams_generated_today: 0, // fallback cannot compute "today", keep zero to avoid overcount
       };
     }
   },
