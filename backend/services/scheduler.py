@@ -27,9 +27,14 @@ JOB_METADATA = {
         "description": "每天 02:00 对所有植物进行生长分析",
         "cron_expr": "0 2 * * *",
     },
-    "periodic_llm_and_dream": {
-        "name": "6小时LLM报告",
-        "description": "每6小时生成一次 LLM 分析报告并生成梦境图",
+    "periodic_llm_report": {
+        "name": "6小时LLM文字报告",
+        "description": "每6小时生成一次 LLM 分析报告",
+        "cron_expr": "0 */6 * * *",
+    },
+    "periodic_dream_image": {
+        "name": "6小时梦境图生成",
+        "description": "每6小时生成一次梦境花园图像",
         "cron_expr": "0 */6 * * *",
     },
 }
@@ -280,12 +285,14 @@ def _sync_jobs_table():
     """
     db = SessionLocal()
     try:
+        seen_keys = set()
         for job in scheduler.get_jobs():
             if job.id not in JOB_METADATA:
                 continue
             meta = JOB_METADATA[job.id]
             next_run = job.next_run_time
             status = "running" if next_run else "paused"
+            seen_keys.add(job.id)
 
             record = db.query(SchedulerJob).filter_by(job_key=job.id).first()
             if not record:
@@ -304,6 +311,68 @@ def _sync_jobs_table():
                 record.cron_expr = meta.get("cron_expr")
                 record.status = status
                 record.next_run_time = next_run
+        # Clean up records for jobs no longer tracked
+        db.query(SchedulerJob).filter(~SchedulerJob.job_key.in_(JOB_METADATA.keys())).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+
+def run_periodic_llm_report():
+    """
+    6-hour job:
+    - For each plant with data in the last 24 hours:
+    - Run analysis + LLM report (no dream image).
+    """
+    db = SessionLocal()
+    try:
+        plants = db.query(Plant).all()
+        if not plants:
+            return
+
+        for plant in plants:
+            if not _has_recent_data(db, plant.id, days=1):
+                continue
+
+            _run_single_analysis_and_optionals(
+                plant=plant,
+                db=db,
+                include_llm=True,
+                include_dream=False,
+            )
+
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+
+def run_periodic_dream_image():
+    """
+    6-hour job:
+    - For each plant with data in the last 24 hours:
+    - Run analysis + dream garden image (no LLM text).
+    """
+    db = SessionLocal()
+    try:
+        plants = db.query(Plant).all()
+        if not plants:
+            return
+
+        for plant in plants:
+            if not _has_recent_data(db, plant.id, days=1):
+                continue
+
+            _run_single_analysis_and_optionals(
+                plant=plant,
+                db=db,
+                include_llm=False,
+                include_dream=True,
+            )
+
         db.commit()
     except Exception:
         db.rollback()
@@ -334,11 +403,18 @@ def start_scheduler():
             run_daily_analysis, "cron", hour=2, minute=0, id="daily_analysis"
         )
         scheduler.add_job(
-            run_periodic_llm_and_dream,
+            run_periodic_llm_report,
             "cron",
             hour="0,6,12,18",
             minute=0,
-            id="periodic_llm_and_dream",
+            id="periodic_llm_report",
+        )
+        scheduler.add_job(
+            run_periodic_dream_image,
+            "cron",
+            hour="0,6,12,18",
+            minute=0,
+            id="periodic_dream_image",
         )
 
     scheduler.start()
