@@ -106,7 +106,9 @@ export function Admin() {
             <Activity className={`w-6 h-6 ${jobsLoading ? 'text-gray-400' : 'text-green-600'}`} />
             <div>
               <p className="text-gray-900">APScheduler 状态</p>
-              <p className="text-sm text-gray-600">{jobsLoading ? '加载中...' : '运行中（见下方任务列表）'}</p>
+              <p className={`text-sm ${jobsLoading ? 'text-gray-600' : 'text-green-600'}`}>
+                {jobsLoading ? '加载中...' : '运行中（见下方任务列表）'}
+              </p>
             </div>
           </div>
         </div>
