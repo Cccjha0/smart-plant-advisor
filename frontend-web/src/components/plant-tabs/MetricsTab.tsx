@@ -1,24 +1,85 @@
-import { useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from 'recharts';
 import { Calendar, Download } from 'lucide-react';
-import { mockDetailedMetrics, mockGrowthAnalysis } from '../../utils/mockData';
+import { api, HourlyMetric, DailyMetric } from '../../utils/api';
 
 export function MetricsTab({ plantId }: { plantId: number }) {
-  const [timeRange, setTimeRange] = useState('7d');
+  const [timeRange, setTimeRange] = useState<'24h' | '3d' | '7d'>('7d');
   const [visibleLines, setVisibleLines] = useState({
     temperature: true,
     light: true,
     moisture: true,
-    weight: true
+    weight: true,
   });
+  const [daily, setDaily] = useState<DailyMetric[]>([]);
+  const [hourly, setHourly] = useState<HourlyMetric[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [d7, h24] = await Promise.all([
+          api.getMetricsDaily7d(plantId).catch(() => ({ metrics: [] })),
+          api.getMetricsHourly24h(plantId).catch(() => ({ metrics: [] })),
+        ]);
+        setDaily(d7.metrics || []);
+        setHourly(h24.metrics || []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [plantId]);
 
   const toggleLine = (key: keyof typeof visibleLines) => {
     setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const chartData = useMemo(() => {
+    if (timeRange === '24h') {
+      return hourly.map((m) => ({
+        time: m.hour,
+        temperature: m.temperature,
+        light: m.light,
+        moisture: m.soil_moisture,
+        weight: m.weight,
+      }));
+    }
+    // 3d/7d 都用 daily-7d（前端裁剪）
+    const limit = timeRange === '3d' ? 3 : 7;
+    return daily.slice(-limit).map((m) => ({
+      time: m.date,
+      temperature: m.temperature,
+      light: m.light,
+      moisture: m.soil_moisture,
+      weight: m.weight,
+    }));
+  }, [timeRange, hourly, daily]);
+
+  const growthRateData = useMemo(() => {
+    // 无专用增长率接口，这里简单用 weight 差分近似
+    return daily.map((m, idx) => {
+      const prev = daily[idx - 3];
+      const rate = prev && m.weight != null && prev.weight != null
+        ? ((m.weight - prev.weight) / Math.abs(prev.weight || 1)) * 100
+        : null;
+      return { date: m.date, rate };
+    }).filter((d) => d.rate != null);
+  }, [daily]);
+
   return (
     <div className="space-y-6">
-      {/* Time Range Selector */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -26,10 +87,10 @@ export function MetricsTab({ plantId }: { plantId: number }) {
             <h2 className="text-gray-900">时间区间选择</h2>
           </div>
           <div className="flex gap-2">
-            {['24h', '3d', '7d', '30d'].map((range) => (
+            {['24h', '3d', '7d'].map((range) => (
               <button
                 key={range}
-                onClick={() => setTimeRange(range)}
+                onClick={() => setTimeRange(range as '24h' | '3d' | '7d')}
                 className={`px-4 py-2 rounded-lg transition-colors ${
                   timeRange === range
                     ? 'bg-green-500 text-white'
@@ -39,14 +100,12 @@ export function MetricsTab({ plantId }: { plantId: number }) {
                 {range === '24h' && '24小时'}
                 {range === '3d' && '3天'}
                 {range === '7d' && '7天'}
-                {range === '30d' && '30天'}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Multi-dimensional Chart */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-gray-900">多维度数据图表</h2>
@@ -65,85 +124,86 @@ export function MetricsTab({ plantId }: { plantId: number }) {
           </div>
         </div>
 
-        <ResponsiveContainer width="100%" height={400}>
-          <LineChart data={mockDetailedMetrics}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="timestamp" tick={{ fontSize: 12 }} stroke="#9ca3af" />
-            <YAxis yAxisId="left" tick={{ fontSize: 12 }} stroke="#9ca3af" />
-            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} stroke="#9ca3af" />
-            <Tooltip />
-            <Legend />
-            {visibleLines.temperature && (
-              <Line yAxisId="left" type="monotone" dataKey="temperature" stroke="#ef4444" strokeWidth={2} dot={false} name="温度 (°C)" />
-            )}
-            {visibleLines.light && (
-              <Line yAxisId="right" type="monotone" dataKey="light" stroke="#f59e0b" strokeWidth={2} dot={false} name="光照 (lux)" />
-            )}
-            {visibleLines.moisture && (
-              <Line yAxisId="left" type="monotone" dataKey="moisture" stroke="#3b82f6" strokeWidth={2} dot={false} name="湿度 (%)" />
-            )}
-            {visibleLines.weight && (
-              <Line yAxisId="right" type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2} dot={false} name="重量 (g)" />
-            )}
-          </LineChart>
-        </ResponsiveContainer>
+        {loading ? (
+          <p className="text-gray-500">加载中...</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="#9ca3af" />
+              <YAxis yAxisId="left" tick={{ fontSize: 12 }} stroke="#9ca3af" />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} stroke="#9ca3af" />
+              <Tooltip />
+              <Legend />
+              {visibleLines.temperature && (
+                <Line yAxisId="left" type="monotone" dataKey="temperature" stroke="#ef4444" strokeWidth={2} dot={false} name="温度 (°C)" />
+              )}
+              {visibleLines.light && (
+                <Line yAxisId="right" type="monotone" dataKey="light" stroke="#f59e0b" strokeWidth={2} dot={false} name="光照 (lux)" />
+              )}
+              {visibleLines.moisture && (
+                <Line yAxisId="left" type="monotone" dataKey="moisture" stroke="#3b82f6" strokeWidth={2} dot={false} name="湿度 (%)" />
+              )}
+              {visibleLines.weight && (
+                <Line yAxisId="right" type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2} dot={false} name="重量 (g)" />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
-      {/* Growth Analysis Visualization */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-gray-900 mb-6">生长算法可视化</h2>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Daily Reference Weight */}
           <div>
             <h3 className="text-gray-900 mb-4">日参考体重</h3>
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={mockGrowthAnalysis.dailyWeight}>
+              <LineChart data={daily}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="actual" stroke="#10b981" strokeWidth={2} name="实际重量" />
-                <Line type="monotone" dataKey="reference" stroke="#6366f1" strokeWidth={2} strokeDasharray="5 5" name="参考重量" />
+                <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2} name="平均重量" />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          {/* 3-Day Growth Rate */}
           <div>
-            <h3 className="text-gray-900 mb-4">3日生长率</h3>
+            <h3 className="text-gray-900 mb-4">3日生长率 (近似)</h3>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={mockGrowthAnalysis.growthRate}>
+              <BarChart data={growthRateData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="rate" fill="#10b981" name="生长率 (%)" />
+                <Bar dataKey="rate" fill="#10b981" name="增长率(%)" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Stress Factors */}
         <div className="mt-6">
-          <h3 className="text-gray-900 mb-4">压力因子分析</h3>
+          <h3 className="text-gray-900 mb-4">压力因子（简化）</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {mockGrowthAnalysis.stressFactors.map((factor, index) => (
+            {[
+              { name: '温度压力', value: 0 },
+              { name: '湿度压力', value: 0 },
+              { name: '光照压力', value: 0 },
+              { name: '生长压力', value: 0 },
+            ].map((factor, index) => (
               <div key={index} className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600 mb-2">{factor.name}</p>
                 <div className="flex items-end gap-2">
                   <p className="text-2xl text-gray-900">{factor.value.toFixed(1)}</p>
-                  <p className="text-sm text-gray-500 mb-1">/ {factor.max}</p>
+                  <p className="text-sm text-gray-500 mb-1">/ 10</p>
                 </div>
                 <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
                   <div
-                    className={`h-2 rounded-full ${
-                      factor.value < factor.max * 0.3 ? 'bg-green-500' :
-                      factor.value < factor.max * 0.7 ? 'bg-yellow-500' : 'bg-red-500'
-                    }`}
-                    style={{ width: `${(factor.value / factor.max) * 100}%` }}
+                    className="h-2 rounded-full bg-green-500"
+                    style={{ width: `${(factor.value / 10) * 100}%` }}
                   />
                 </div>
               </div>
@@ -152,7 +212,6 @@ export function MetricsTab({ plantId }: { plantId: number }) {
         </div>
       </div>
 
-      {/* Raw Data Table */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-gray-900">原始数据表格</h2>
@@ -161,28 +220,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
             <span className="text-sm">导出 CSV</span>
           </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm text-gray-700">时间戳</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-700">传感器类型</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-700">原始值</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-700">单位</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {mockDetailedMetrics.slice(0, 10).map((metric, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-900">{metric.timestamp}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">Temperature</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{metric.temperature}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">°C</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <div className="p-6 text-sm text-gray-500">原始数据表格对接待补充（当前占位）。</div>
       </div>
     </div>
   );

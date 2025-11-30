@@ -1,75 +1,61 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image as ImageIcon, X } from 'lucide-react';
-import { mockPhotos } from '../../utils/mockData';
+import { api, DreamDto } from '../../utils/api';
 
 export function PhotosTab({ plantId }: { plantId: number }) {
-  const [selectedPhoto, setSelectedPhoto] = useState<any>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<DreamDto | null>(null);
+  const [photos, setPhotos] = useState<DreamDto[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const groupPhotosByDate = (photos: any[]) => {
-    const groups: { [key: string]: any[] } = {
-      '今天': [],
-      '昨天': [],
-      '本周': [],
-      '更早': []
+  useEffect(() => {
+    const load = async () => {
+      try {
+        // 暂无独立 images 列表接口，先复用 dream images 作为占位
+        const list = await api.getDreamsByPlant(plantId).catch(() => []);
+        setPhotos(list || []);
+      } finally {
+        setLoading(false);
+      }
     };
-
-    photos.forEach((photo) => {
-      if (photo.date.includes('11-28')) groups['今天'].push(photo);
-      else if (photo.date.includes('11-27')) groups['昨天'].push(photo);
-      else if (photo.date.includes('11-2')) groups['本周'].push(photo);
-      else groups['更早'].push(photo);
-    });
-
-    return groups;
-  };
-
-  const groupedPhotos = groupPhotosByDate(mockPhotos);
+    load();
+  }, [plantId]);
 
   return (
     <div className="space-y-6">
-      {/* Photo Timeline */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-gray-900 mb-6">照片时间轴</h2>
 
-        {Object.entries(groupedPhotos).map(([group, photos]) => (
-          photos.length > 0 && (
-            <div key={group} className="mb-8 last:mb-0">
-              <h3 className="text-gray-700 mb-4">{group}</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {photos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    onClick={() => setSelectedPhoto(photo)}
-                    className="cursor-pointer group"
-                  >
-                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-2">
-                      <div className="w-full h-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <ImageIcon className="w-12 h-12 text-gray-400" />
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-600">{photo.time}</p>
-                    {photo.analysisStatus && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        photo.analysisStatus === 'success'
-                          ? 'bg-green-100 text-green-700'
-                          : photo.analysisStatus === 'pending'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {photo.analysisStatus === 'success' && '已分析'}
-                        {photo.analysisStatus === 'pending' && '分析中'}
-                        {photo.analysisStatus === 'failed' && '失败'}
-                      </span>
-                    )}
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">加载中...</p>
+          </div>
+        ) : photos.length === 0 ? (
+          <div className="text-center py-12">
+            <ImageIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">暂无照片</p>
+            <p className="text-sm text-gray-400 mt-1">后端无 images 列表接口，暂用梦境图占位</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {photos.map((photo) => (
+              <div
+                key={photo.id}
+                onClick={() => setSelectedPhoto(photo)}
+                className="cursor-pointer group"
+              >
+                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-2">
+                  <div className="w-full h-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <ImageIcon className="w-12 h-12 text-gray-400" />
                   </div>
-                ))}
+                </div>
+                <p className="text-xs text-gray-600">{new Date(photo.created_at).toLocaleString()}</p>
+                <p className="text-xs text-gray-500 line-clamp-2">{photo.description || '暂无描述'}</p>
               </div>
-            </div>
-          )
-        ))}
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Photo Detail Modal */}
       {selectedPhoto && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -91,20 +77,18 @@ export function PhotosTab({ plantId }: { plantId: number }) {
               <div className="grid grid-cols-2 gap-6 mb-6">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">拍摄时间</p>
-                  <p className="text-gray-900">{selectedPhoto.date} {selectedPhoto.time}</p>
+                  <p className="text-gray-900 text-sm">{new Date(selectedPhoto.created_at).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">文件路径</p>
-                  <p className="text-gray-900 text-sm">{selectedPhoto.path}</p>
+                  <p className="text-gray-900 text-sm break-all">{selectedPhoto.file_path}</p>
                 </div>
               </div>
 
-              {selectedPhoto.analysis && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-gray-900 mb-2">LLM 视觉分析摘要</h3>
-                  <p className="text-gray-700 leading-relaxed">{selectedPhoto.analysis}</p>
-                </div>
-              )}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-gray-900 mb-2">描述</h3>
+                <p className="text-gray-700 leading-relaxed">{selectedPhoto.description || '暂无描述'}</p>
+              </div>
             </div>
           </div>
         </div>
