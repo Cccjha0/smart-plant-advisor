@@ -14,7 +14,7 @@ class ImageOut(BaseModel):
     id: int
     plant_id: int
     file_path: str
-    captured_at: str
+    captured_at: datetime
     plant_type: str | None = None
     leaf_health: str | None = None
     symptoms: dict | None = None
