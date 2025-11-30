@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Calendar, Download } from 'lucide-react';
 import { mockDetailedMetrics, mockGrowthAnalysis } from '../../utils/mockData';
 
-export function MetricsTab({ plantId }: { plantId: string }) {
+export function MetricsTab({ plantId }: { plantId: number }) {
   const [timeRange, setTimeRange] = useState('7d');
   const [visibleLines, setVisibleLines] = useState({
     temperature: true,

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FileText, RefreshCw, Copy, Check } from 'lucide-react';
 import { mockReports } from '../../utils/mockData';
 
-export function ReportsTab({ plantId }: { plantId: string }) {
+export function ReportsTab({ plantId }: { plantId: number }) {
   const [selectedReport, setSelectedReport] = useState(mockReports[0]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);

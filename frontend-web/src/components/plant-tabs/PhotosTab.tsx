@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Image as ImageIcon, X } from 'lucide-react';
 import { mockPhotos } from '../../utils/mockData';
 
-export function PhotosTab({ plantId }: { plantId: string }) {
+export function PhotosTab({ plantId }: { plantId: number }) {
   const [selectedPhoto, setSelectedPhoto] = useState<any>(null);
 
   const groupPhotosByDate = (photos: any[]) => {

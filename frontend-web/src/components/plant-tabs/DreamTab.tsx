@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import { mockDreams } from '../../utils/mockData';
 
-export function DreamTab({ plantId, plantName }: { plantId: string; plantName: string }) {
+export function DreamTab({ plantId, plantName }: { plantId: number; plantName: string }) {
   const [selectedDream, setSelectedDream] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
