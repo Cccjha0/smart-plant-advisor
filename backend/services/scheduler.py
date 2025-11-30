@@ -37,6 +37,11 @@ JOB_METADATA = {
         "description": "每6小时生成一次梦境花园图像",
         "cron_expr": "0 */6 * * *",
     },
+    "weekly_data_cleanup": {
+        "name": "数据清理任务",
+        "description": "每周清理30天前的旧传感器数据",
+        "cron_expr": "0 2 * * 0",  # every Sunday 02:00 UTC
+    },
 }
 
 
@@ -380,6 +385,23 @@ def run_periodic_dream_image():
         db.close()
 
 
+def run_weekly_data_cleanup(retention_days: int = 30):
+    """
+    Weekly job:
+    - Delete sensor_records and weight_records older than retention_days.
+    """
+    cutoff = datetime.utcnow() - timedelta(days=retention_days)
+    db = SessionLocal()
+    try:
+        db.query(SensorRecord).filter(SensorRecord.timestamp < cutoff).delete(synchronize_session=False)
+        db.query(WeightRecord).filter(WeightRecord.timestamp < cutoff).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+
 def get_scheduler_jobs_snapshot():
     """
     Update DB with latest next_run_time/status and return list of SchedulerJob rows.
@@ -415,6 +437,14 @@ def start_scheduler():
             hour="0,6,12,18",
             minute=0,
             id="periodic_dream_image",
+        )
+        scheduler.add_job(
+            run_weekly_data_cleanup,
+            "cron",
+            day_of_week="sun",
+            hour=2,
+            minute=0,
+            id="weekly_data_cleanup",
         )
 
     scheduler.start()
