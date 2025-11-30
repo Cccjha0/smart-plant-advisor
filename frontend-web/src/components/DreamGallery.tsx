@@ -35,8 +35,8 @@ export function DreamGallery() {
 
   const filteredDreams = useMemo(() => {
     return dreams.filter((dream) => {
-      const name = getPlantName(dream.plant_id).toLowerCase();
-      const matchesSearch = name.includes(searchTerm.toLowerCase());
+      const plantName = getPlantName(dream.plant_id).toLowerCase();
+      const matchesSearch = plantName.includes(searchTerm.toLowerCase());
       const matchesFilter = filterPlant === 'all' || `${dream.plant_id}` === filterPlant;
       return matchesSearch && matchesFilter;
     });
@@ -78,15 +78,6 @@ export function DreamGallery() {
                   </option>
                 ))}
               </select>
-              {filterPlant !== 'all' && (
-                <button
-                  onClick={() => setFilterPlant('all')}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  aria-label="clear plant filter"
-                >
-                  <X className="w-4 h-4 text-gray-600" />
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -102,7 +93,7 @@ export function DreamGallery() {
             <p className="text-gray-500">没有找到匹配的梦境图</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl-grid-cols-5 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {filteredDreams.map((dream) => (
               <div
                 key={dream.id}
@@ -116,7 +107,7 @@ export function DreamGallery() {
                 </div>
                 <h3 className="text-gray-900 mb-1">{getPlantName(dream.plant_id)}</h3>
                 <p className="text-sm text-gray-500 mb-2">{new Date(dream.created_at).toLocaleString()}</p>
-                {dream.description && <p className="text-xs text-gray-600 line-clamp-2">{dream.description}</p>}
+                <p className="text-xs text-gray-600 line-clamp-2">{dream.description || '暂无描述'}</p>
               </div>
             ))}
           </div>
@@ -137,7 +128,6 @@ export function DreamGallery() {
                 <button
                   onClick={() => setSelectedDream(null)}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  aria-label="close"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -149,7 +139,7 @@ export function DreamGallery() {
                 </div>
 
                 <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <h3 className="text-gray-900 mb-2">梦境描述</h3>
+                  <h3 className="text-gray-900 mb-2">完整梦境描述</h3>
                   <p className="text-gray-700 leading-relaxed">{selectedDream.description || '暂无描述'}</p>
                   <p className="text-sm text-gray-500 mt-3 break-all">文件路径: {selectedDream.file_path}</p>
                 </div>
