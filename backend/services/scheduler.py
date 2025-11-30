@@ -5,7 +5,14 @@ from sqlalchemy import func
 
 from database import SessionLocal
 from config import SUPABASE_DREAM_BUCKET
-from models import Plant, SensorRecord, AnalysisResult, WeightRecord, DreamImageRecord
+from models import (
+    Plant,
+    SensorRecord,
+    AnalysisResult,
+    WeightRecord,
+    DreamImageRecord,
+    SchedulerJob,
+)
 from services.growth_service import GrowthService
 from services.llm_service import LLMService
 from services.storage import upload_bytes
@@ -13,6 +20,19 @@ from services.storage import upload_bytes
 scheduler = BackgroundScheduler()
 growth_service = GrowthService()
 llm_service = LLMService()
+
+JOB_METADATA = {
+    "daily_analysis": {
+        "name": "每日植物分析",
+        "description": "每天 02:00 对所有植物进行生长分析",
+        "cron_expr": "0 2 * * *",
+    },
+    "periodic_llm_and_dream": {
+        "name": "6小时LLM报告",
+        "description": "每6小时生成一次 LLM 分析报告并生成梦境图",
+        "cron_expr": "0 */6 * * *",
+    },
+}
 
 
 def _get_last_data_timestamp(db, plant_id: int) -> datetime | None:
@@ -250,6 +270,57 @@ def schedule_post_watering_job(plant_id: int, delay_minutes: int = 60):
         id=job_id,
         replace_existing=False,
     )
+    _sync_jobs_table()
+
+
+def _sync_jobs_table():
+    """
+    Persist known scheduler jobs into DB with next run time and status.
+    Only tracks jobs defined in JOB_METADATA.
+    """
+    db = SessionLocal()
+    try:
+        for job in scheduler.get_jobs():
+            if job.id not in JOB_METADATA:
+                continue
+            meta = JOB_METADATA[job.id]
+            next_run = job.next_run_time
+            status = "running" if next_run else "paused"
+
+            record = db.query(SchedulerJob).filter_by(job_key=job.id).first()
+            if not record:
+                record = SchedulerJob(
+                    job_key=job.id,
+                    name=meta.get("name"),
+                    description=meta.get("description"),
+                    cron_expr=meta.get("cron_expr"),
+                    status=status,
+                    next_run_time=next_run,
+                )
+                db.add(record)
+            else:
+                record.name = meta.get("name")
+                record.description = meta.get("description")
+                record.cron_expr = meta.get("cron_expr")
+                record.status = status
+                record.next_run_time = next_run
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+
+def get_scheduler_jobs_snapshot():
+    """
+    Update DB with latest next_run_time/status and return list of SchedulerJob rows.
+    """
+    _sync_jobs_table()
+    db = SessionLocal()
+    try:
+        return db.query(SchedulerJob).all()
+    finally:
+        db.close()
 
 
 def start_scheduler():
@@ -259,10 +330,19 @@ def start_scheduler():
     - A 6-hour LLM + dream image job
     """
     if not scheduler.get_jobs():
-        scheduler.add_job(run_daily_analysis, "cron", hour=2, minute=0)
-        scheduler.add_job(run_periodic_llm_and_dream, "cron", hour="0,6,12,18", minute=0)
+        scheduler.add_job(
+            run_daily_analysis, "cron", hour=2, minute=0, id="daily_analysis"
+        )
+        scheduler.add_job(
+            run_periodic_llm_and_dream,
+            "cron",
+            hour="0,6,12,18",
+            minute=0,
+            id="periodic_llm_and_dream",
+        )
 
     scheduler.start()
+    _sync_jobs_table()
 
 
 def shutdown_scheduler():

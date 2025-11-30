@@ -5,6 +5,7 @@ from .weight_records import WeightRecord
 from .analysis_results import AnalysisResult
 from .dream_images import DreamImageRecord
 from .alerts import Alert
+from .scheduler_jobs import SchedulerJob
 
 __all__ = [
     "Plant",
@@ -14,4 +15,5 @@ __all__ = [
     "AnalysisResult",
     "DreamImageRecord",
     "Alert",
+    "SchedulerJob",
 ]
