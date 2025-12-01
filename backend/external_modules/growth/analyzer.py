@@ -114,7 +114,7 @@ def _compute_daily_reference_points(
             WeightRecord.weight,
             SensorRecord.soil_moisture,
         )
-        .join(
+        .outerjoin(
             SensorRecord,
             (SensorRecord.plant_id == WeightRecord.plant_id)
             & (SensorRecord.timestamp == WeightRecord.timestamp),
