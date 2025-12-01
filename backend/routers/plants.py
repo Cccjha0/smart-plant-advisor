@@ -8,7 +8,7 @@ from sqlalchemy import func
 
 from pydantic import BaseModel, ConfigDict
 
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from datetime import datetime, timedelta
 
@@ -24,6 +24,33 @@ from external_modules.growth import analyzer as growth_analyzer
 
 router = APIRouter()
 
+
+
+def _latest_sensor_value(db: Session, plant_id: int, column):
+    row = (
+        db.query(column, SensorRecord.timestamp)
+        .filter(SensorRecord.plant_id == plant_id, column.isnot(None))
+        .order_by(SensorRecord.timestamp.desc())
+        .first()
+    )
+    return (row[0], row[1]) if row else (None, None)
+
+
+def _latest_weight_value(db: Session, plant_id: int):
+    row = (
+        db.query(WeightRecord.weight, WeightRecord.timestamp)
+        .filter(WeightRecord.plant_id == plant_id, WeightRecord.weight.isnot(None))
+        .order_by(WeightRecord.timestamp.desc())
+        .first()
+    )
+    return (row[0], row[1]) if row else (None, None)
+
+
+def _soil_pct(raw: Optional[float]) -> Optional[float]:
+    if raw is None:
+        return None
+    pct = (255.0 - raw) / 255.0 * 100.0
+    return round(max(0.0, min(100.0, pct)), 2)
 
 
 
@@ -204,6 +231,38 @@ def list_plants_by_status(
 
 
 
+
+
+@router.get("/plants/{plant_id}/latest-summary")
+def get_latest_summary(plant_id: int, db: Session = Depends(get_db)):
+    """
+    Latest sensor snapshot (temperature, light, soil_moisture %, weight) and latest suggestions.
+    """
+    temp_val, temp_ts = _latest_sensor_value(db, plant_id, SensorRecord.temperature)
+    light_val, light_ts = _latest_sensor_value(db, plant_id, SensorRecord.light)
+    soil_raw, soil_ts = _latest_sensor_value(db, plant_id, SensorRecord.soil_moisture)
+    weight_val, weight_ts = _latest_weight_value(db, plant_id)
+
+    latest_analysis = (
+        db.query(AnalysisResult)
+        .filter(AnalysisResult.plant_id == plant_id)
+        .order_by(AnalysisResult.created_at.desc())
+        .first()
+    )
+
+    def _entry(value, ts):
+        return {"value": value, "timestamp": ts.isoformat() if ts else None}
+
+    return {
+        "plant_id": plant_id,
+        "sensors": {
+            "temperature": _entry(temp_val, temp_ts),
+            "light": _entry(light_val, light_ts),
+            "soil_moisture": _entry(_soil_pct(soil_raw), soil_ts),
+            "weight": _entry(weight_val, weight_ts),
+        },
+        "suggestions": latest_analysis.suggestions if latest_analysis else None,
+    }
 
 
 @router.get("/plants/{plant_id}/raw-data")
