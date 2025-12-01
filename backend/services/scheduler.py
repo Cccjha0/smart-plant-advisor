@@ -111,6 +111,7 @@ def _run_single_analysis_and_optionals(
     db,
     include_llm: bool,
     include_dream: bool,
+    trigger: str = "default",
 ) -> None:
     plant_id = plant.id
     seven_days_ago = datetime.utcnow() - timedelta(days=7)
@@ -152,6 +153,8 @@ def _run_single_analysis_and_optionals(
         llm_short = llm_output.get("growth_overview") or llm_output.get("short_report")
         llm_long = llm_output.get("full_analysis") or llm_output.get("long_report")
         plant_type = llm_output.get("plant_type")
+        if (plant_type is None or plant_type == "" or plant_type == "unknown") and plant.species:
+            plant_type = plant.species
         alert_msg = llm_output.get("alert")
 
     analysis_record = AnalysisResult(
@@ -159,6 +162,7 @@ def _run_single_analysis_and_optionals(
         growth_status=analysis_payload["growth_status"],
         growth_rate_3d=analysis_payload["growth_rate_3d"],
         plant_type=plant_type,
+        trigger=trigger,
         growth_overview=llm_short,
         environment_assessment=None,
         suggestions=None,
@@ -174,14 +178,14 @@ def _run_single_analysis_and_optionals(
 
     # If alert exists, store it
     if alert_msg:
-        db.add(
-            Alert(
-                plant_id=plant_id,
-                analysis_result_id=analysis_record.id,
-                message=alert_msg,
-                created_at=datetime.utcnow(),
+            db.add(
+                Alert(
+                    plant_id=plant_id,
+                    analysis_result_id=analysis_record.id,
+                    message=alert_msg,
+                    created_at=datetime.utcnow(),
+                )
             )
-        )
 
     if include_dream:
         dream_result = llm_service.generate_dream_image(plant_id, analysis_payload)
@@ -204,8 +208,10 @@ def _run_single_analysis_and_optionals(
             db.add(
                 DreamImageRecord(
                     plant_id=plant_id,
+                    sensor_record_id=None,
+                    weight_record_id=None,
                     file_path=public_url or storage_path,
-                    description=None,
+                    description=dream_result.get("description"),
                     created_at=datetime.utcnow(),
                 )
             )
@@ -237,6 +243,7 @@ def run_daily_analysis():
                 db=db,
                 include_llm=False,
                 include_dream=False,
+                trigger="scheduled",
             )
 
         db.commit()
@@ -266,6 +273,7 @@ def run_periodic_llm_and_dream():
                 db=db,
                 include_llm=True,
                 include_dream=True,
+                trigger="scheduled",
             )
 
         db.commit()
@@ -375,6 +383,7 @@ def run_post_watering_job(plant_id: int):
             db=db,
             include_llm=True,
             include_dream=True,
+            trigger="watering",
         )
 
         db.commit()

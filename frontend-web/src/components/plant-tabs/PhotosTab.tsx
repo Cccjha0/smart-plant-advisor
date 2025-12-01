@@ -1,75 +1,125 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image as ImageIcon, X } from 'lucide-react';
-import { mockPhotos } from '../../utils/mockData';
+import { api } from '../../utils/api';
 
-export function PhotosTab({ plantId }: { plantId: string }) {
-  const [selectedPhoto, setSelectedPhoto] = useState<any>(null);
+type PhotoItem = {
+  id: number;
+  plant_id: number;
+  file_path: string;
+  captured_at: string;
+  plant_type?: string | null;
+  leaf_health?: string | null;
+  symptoms?: any;
+};
 
-  const groupPhotosByDate = (photos: any[]) => {
-    const groups: { [key: string]: any[] } = {
-      '今天': [],
-      '昨天': [],
-      '本周': [],
-      '更早': []
+export function PhotosTab({ plantId }: { plantId: number }) {
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadedIds, setLoadedIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const list = await api.getImagesByPlant(plantId).catch(() => []);
+        setPhotos(list || []);
+      } finally {
+        setLoading(false);
+      }
     };
+    load();
+  }, [plantId]);
 
-    photos.forEach((photo) => {
-      if (photo.date.includes('11-28')) groups['今天'].push(photo);
-      else if (photo.date.includes('11-27')) groups['昨天'].push(photo);
-      else if (photo.date.includes('11-2')) groups['本周'].push(photo);
-      else groups['更早'].push(photo);
+  const groupedList = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const grouped = photos.reduce<Record<string, { label: string; items: PhotoItem[] }>>((acc, item) => {
+      const dateObj = new Date(item.captured_at);
+      const key = `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}`; // 本地日期
+      const label = `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())} (${dateObj.toLocaleDateString('zh-CN', { weekday: 'short' })})`;
+
+      if (!acc[key]) {
+        acc[key] = { label, items: [] };
+      }
+      acc[key].items.push(item);
+      return acc;
+    }, {});
+
+    return Object.entries(grouped)
+      .sort(([a], [b]) => (a > b ? -1 : 1)) // 按日期倒序
+      .map(([, value]) => ({
+        ...value,
+        items: value.items.sort((a, b) => (a.captured_at > b.captured_at ? -1 : 1)),
+      }));
+  }, [photos]);
+
+  const handleImageLoad = (id: number) => {
+    setLoadedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
     });
-
-    return groups;
   };
-
-  const groupedPhotos = groupPhotosByDate(mockPhotos);
 
   return (
     <div className="space-y-6">
-      {/* Photo Timeline */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-gray-900 mb-6">照片时间轴</h2>
 
-        {Object.entries(groupedPhotos).map(([group, photos]) => (
-          photos.length > 0 && (
-            <div key={group} className="mb-8 last:mb-0">
-              <h3 className="text-gray-700 mb-4">{group}</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {photos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    onClick={() => setSelectedPhoto(photo)}
-                    className="cursor-pointer group"
-                  >
-                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-2">
-                      <div className="w-full h-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <ImageIcon className="w-12 h-12 text-gray-400" />
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">加载中...</p>
+          </div>
+        ) : groupedList.length === 0 ? (
+          <div className="text-center py-12">
+            <ImageIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">暂无照片</p>
+          </div>
+        ) : (
+          <div className="space-y-28 relative">
+            <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
+            {groupedList.map((group, groupIndex) => (
+              <div key={group.label} className="relative pl-10 pb-4">
+                <div className="mb-4">
+                  <p className="text-sm text-black">{group.label}</p>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {group.items.map((photo) => (
+                    <div
+                      key={`${groupIndex}-${photo.id}`}
+                      onClick={() => setSelectedPhoto(photo)}
+                      className="cursor-pointer group"
+                    >
+                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-2 relative">
+                        {!loadedIds.has(photo.id) && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <ImageIcon className="w-8 h-8 text-gray-400" />
+                          </div>
+                        )}
+                        <img
+                          src={photo.file_path}
+                          alt={photo.plant_type || 'photo'}
+                          className={`w-full h-full object-cover transition-opacity duration-300 ${
+                            loadedIds.has(photo.id) ? 'opacity-100' : 'opacity-0'
+                          }`}
+                          loading="lazy"
+                          onLoad={() => handleImageLoad(photo.id)}
+                          onError={() => handleImageLoad(photo.id)}
+                        />
                       </div>
+                      <p className="text-xs text-gray-600">
+                        {new Date(photo.captured_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      {/* 类型信息不再展示 */}
                     </div>
-                    <p className="text-xs text-gray-600">{photo.time}</p>
-                    {photo.analysisStatus && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        photo.analysisStatus === 'success'
-                          ? 'bg-green-100 text-green-700'
-                          : photo.analysisStatus === 'pending'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {photo.analysisStatus === 'success' && '已分析'}
-                        {photo.analysisStatus === 'pending' && '分析中'}
-                        {photo.analysisStatus === 'failed' && '失败'}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )
-        ))}
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Photo Detail Modal */}
       {selectedPhoto && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -84,27 +134,25 @@ export function PhotosTab({ plantId }: { plantId: string }) {
             </div>
 
             <div className="p-6">
-              <div className="aspect-video bg-gray-100 rounded-lg mb-6 flex items-center justify-center">
-                <ImageIcon className="w-24 h-24 text-gray-400" />
+              <div className="aspect-video bg-gray-100 rounded-lg mb-6 flex items-center justify-center overflow-hidden">
+                <img
+                  src={selectedPhoto.file_path}
+                  alt={selectedPhoto.plant_type || 'photo'}
+                  className="w-full h-full object-cover"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-6 mb-6">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">拍摄时间</p>
-                  <p className="text-gray-900">{selectedPhoto.date} {selectedPhoto.time}</p>
+                  <p className="text-gray-900 text-sm">{new Date(selectedPhoto.captured_at).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">文件路径</p>
-                  <p className="text-gray-900 text-sm">{selectedPhoto.path}</p>
+                  <p className="text-gray-900 text-sm break-all">{selectedPhoto.file_path}</p>
                 </div>
               </div>
 
-              {selectedPhoto.analysis && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-gray-900 mb-2">LLM 视觉分析摘要</h3>
-                  <p className="text-gray-700 leading-relaxed">{selectedPhoto.analysis}</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
