@@ -76,7 +76,7 @@ def dashboard_system_overview(db: Session = Depends(get_db)):
         .scalar()
     ) or 0
 
-    # Abnormal: latest analysis with growth_status not normal
+    # Abnormal: latest analysis with growth_status == stressed (serious pressure)
     subq = (
         db.query(
             AnalysisResult.plant_id,
@@ -88,7 +88,7 @@ def dashboard_system_overview(db: Session = Depends(get_db)):
     abnormal_plants = (
         db.query(func.count(AnalysisResult.plant_id))
         .join(subq, (AnalysisResult.plant_id == subq.c.plant_id) & (AnalysisResult.created_at == subq.c.max_ts))
-        .filter(AnalysisResult.growth_status != "normal")
+        .filter(AnalysisResult.growth_status == "stressed")
         .scalar()
     ) or 0
 
