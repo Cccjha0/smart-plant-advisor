@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional
+import logging
 
 try:
     from external_modules.llm.workflow_service import WorkflowService  # type: ignore
@@ -8,16 +9,50 @@ except Exception:
 
 class LLMService:
     def __init__(self) -> None:
+        self.logger = logging.getLogger(__name__)
+        if not self.logger.handlers:
+            logging.basicConfig(level=logging.INFO)
         self.workflow: Optional[WorkflowService] = None
         if WorkflowService:
             try:
                 self.workflow = WorkflowService()
+                self.logger.info("LLMService: workflow_service loaded.")
             except Exception:
                 # If Coze is not configured/installed, keep mock fallback
                 self.workflow = None
+                self.logger.warning("LLMService: workflow_service init failed, using mock.")
+        else:
+            self.logger.info("LLMService: workflow_service not available, using mock.")
 
     def generate(self, analysis_payload: Dict) -> Dict:
-        """Generate LLM text report (mock fallback)."""
+        """
+        Generate LLM text report.
+        - If workflow_service is configured, call workflow with full JSON payload.
+        - Otherwise, return mock fallback.
+        """
+        if self.workflow:
+            try:
+                self.logger.info("LLMService.generate: using workflow_service with full payload JSON")
+                def _str_or_blank(v):
+                    return "" if v is None else str(v)
+                full_payload = {
+                    "growth_rate_3d": _str_or_blank(analysis_payload.get("growth_rate_3d")),
+                    "growth_status": _str_or_blank(analysis_payload.get("growth_status")),
+                    "image_url": _str_or_blank(analysis_payload.get("image_url")),
+                    "metrics_snapshot": analysis_payload.get("metrics_snapshot") or {},
+                    "nickname": _str_or_blank(analysis_payload.get("nickname")),
+                    "plant_id": _str_or_blank(analysis_payload.get("plant_id")),
+                    "sensor_data": analysis_payload.get("sensor_data") or {},
+                    "stress_factors": analysis_payload.get("stress_factors") or {},
+                }
+                result = self.workflow.analyze_with_growth_payload(full_payload)
+                if result:
+                    return result
+            except Exception as e:
+                self.logger.warning("LLMService.generate: workflow call failed, fallback to mock. err=%s", e)
+
+        # Mock fallback
+        self.logger.info("LLMService.generate: using mock fallback.")
         plant_type = analysis_payload.get("plant_type") or "your plant"
         growth_status = analysis_payload.get("growth_status") or "normal"
 

@@ -97,7 +97,8 @@ Base URL: `http://<host>:8000`
     "environment_assessment": "...",
     "suggestions": "...",
     "full_analysis": "...",
-    "alert": null
+    "alert": null,
+    "trigger": "manual"
   },
   "analysis_result_id": 7
 }
@@ -110,6 +111,7 @@ Base URL: `http://<host>:8000`
 { "plant_id": 1, "temperature": 23.5, "light": 120.0, "soil_moisture": 45.0, "health_status": "normal" }
 ```
 - Generates dream image, uploads to Supabase Storage (`dream-images`), stores public URL.
+- Backend can call Coze CN workflow (`COZE_API_TOKEN_CN` / `COZE_WORKFLOW_ID_CN`); inputs are strings, `health_status` can reuse latest `analysis_results.full_analysis`.
 - 200:
 ```json
 {
@@ -191,7 +193,7 @@ Base URL: `http://<host>:8000`
 - Counts across plants/images/sensor/analysis/dreams.
 
 ### GET /dashboard/system-overview
-- Summary for dashboard:
+- Summary for dashboard (abnormal_plants = latest analysis per plant with growth_status == 'stressed'):
 ```json
 { "total_plants": 4, "active_last_24h": 3, "abnormal_plants": 1, "dreams_generated_today": 8 }
 ```
