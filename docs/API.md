@@ -92,11 +92,13 @@ Base URL: `http://<host>:8000`
   "plant_id": 1,
   "analysis": { "...": "..." },
   "report": {
+    "plant_type": "Succulent",
     "growth_overview": "...",
     "environment_assessment": "...",
     "suggestions": "...",
     "full_analysis": "...",
-    "alert": null
+    "alert": null,
+    "trigger": "manual"
   },
   "analysis_result_id": 7
 }
@@ -109,6 +111,7 @@ Base URL: `http://<host>:8000`
 { "plant_id": 1, "temperature": 23.5, "light": 120.0, "soil_moisture": 45.0, "health_status": "normal" }
 ```
 - Generates dream image, uploads to Supabase Storage (`dream-images`), stores public URL.
+- Backend can call Coze CN workflow (`COZE_API_TOKEN_CN` / `COZE_WORKFLOW_ID_CN`); inputs are strings, `health_status` can reuse latest `analysis_results.full_analysis`.
 - 200:
 ```json
 {
@@ -153,12 +156,34 @@ Base URL: `http://<host>:8000`
 
 ## Alerts
 ### GET /alerts?limit=20
+- Query params: `limit` (default 20), optional `plant_id`, `analysis_result_id`.
 - Returns recent alerts (message + created_at).
 
 ### POST /alerts
-- Body: `{"message": "string"}`
+- Body: `{"message": "string", "plant_id": int|null, "analysis_result_id": int|null}`
 
 ### DELETE /alerts/{id}
+
+## Scheduler
+### GET /scheduler/jobs
+- Returns registered jobs with status and next run.
+### POST /scheduler/jobs/{id}/pause
+### POST /scheduler/jobs/{id}/resume
+### POST /scheduler/jobs/{id}/run-now
+### GET /scheduler/logs
+- Optional `limit` (default 50). Each item:
+```json
+{
+  "id": 1,
+  "jobKey": "daily_analysis",
+  "jobName": "每日植物分析",
+  "status": "success",
+  "message": "Daily analysis completed",
+  "startedAt": "2024-11-28T08:00:00Z",
+  "finishedAt": "2024-11-28T08:02:15Z",
+  "durationSeconds": 135
+}
+```
 
 ## System / Admin
 ### GET /admin/stats
@@ -168,7 +193,7 @@ Base URL: `http://<host>:8000`
 - Counts across plants/images/sensor/analysis/dreams.
 
 ### GET /dashboard/system-overview
-- Summary for dashboard:
+- Summary for dashboard (abnormal_plants = latest analysis per plant with growth_status == 'stressed'):
 ```json
 { "total_plants": 4, "active_last_24h": 3, "abnormal_plants": 1, "dreams_generated_today": 8 }
 ```

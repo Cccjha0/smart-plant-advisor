@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Depends
@@ -14,6 +14,16 @@ LIGHT_SAMPLE_INTERVAL_MIN = 10.0  # assumed sampling interval for light aggregat
 SOIL_SCALE = 255.0  # raw scale: 0 wet, 255 dry
 
 
+def _iso_utc(ts: Optional[datetime]) -> Optional[str]:
+    if ts is None:
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    else:
+        ts = ts.astimezone(timezone.utc)
+    return ts.isoformat()
+
+
 def _latest_value(db: Session, plant_id: int, column):
     row = (
         db.query(column, SensorRecord.timestamp)
@@ -21,7 +31,7 @@ def _latest_value(db: Session, plant_id: int, column):
         .order_by(SensorRecord.timestamp.desc())
         .first()
     )
-    return row[0] if row else None
+    return row if row else (None, None)
 
 
 def _agg_sensor(db: Session, plant_id: int, column, since: datetime, agg_func):
@@ -101,13 +111,13 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     last_watering_ts = _last_watering(db, plant_id)
 
     # Temperature
-    temp_now = _latest_value(db, plant_id, SensorRecord.temperature)
+    temp_now, temp_ts = _latest_value(db, plant_id, SensorRecord.temperature)
     temp_6h_avg = _agg_sensor(db, plant_id, SensorRecord.temperature, now - timedelta(hours=6), func.avg)
     temp_24h_min = _agg_sensor(db, plant_id, SensorRecord.temperature, now - timedelta(hours=24), func.min)
     temp_24h_max = _agg_sensor(db, plant_id, SensorRecord.temperature, now - timedelta(hours=24), func.max)
 
     # Soil moisture (0 wet, 255 dry raw scale)
-    soil_now = _latest_value(db, plant_id, SensorRecord.soil_moisture)
+    soil_now, soil_ts = _latest_value(db, plant_id, SensorRecord.soil_moisture)
     soil_24h_min = _agg_sensor(db, plant_id, SensorRecord.soil_moisture, now - timedelta(hours=24), func.min)
     soil_24h_max = _agg_sensor(db, plant_id, SensorRecord.soil_moisture, now - timedelta(hours=24), func.max)
     soil_24h_before = _value_at_or_before(db, plant_id, SensorRecord.soil_moisture, now - timedelta(hours=24))
@@ -116,7 +126,7 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
         soil_trend = _soil_pct(soil_now) - _soil_pct(soil_24h_before)
 
     # Light (lux)
-    light_now = _latest_value(db, plant_id, SensorRecord.light)
+    light_now, light_ts = _latest_value(db, plant_id, SensorRecord.light)
     light_1h_avg = _agg_sensor(db, plant_id, SensorRecord.light, now - timedelta(hours=1), func.avg)
     light_today_sum = None
     today_start = datetime.combine(now.date(), datetime.min.time())
@@ -137,6 +147,7 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     # Weight (grams)
     latest_weight = _latest_weight(db, plant_id)
     weight_now = latest_weight[0] if latest_weight else None
+    weight_ts = latest_weight[1] if latest_weight else None
     first_24h = _weight_first_in_window(db, plant_id, now - timedelta(hours=24))
     weight_24h_diff = None
     water_loss_per_hour = None
@@ -161,23 +172,30 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
             hours_span = max(1.0, hours_since_last_watering)
             water_loss_per_hour = weight_drop_since_last_watering / hours_span
 
+    # determine latest sensor timestamp across streams
+    ts_candidates = [temp_ts, soil_ts, light_ts, weight_ts]
+    latest_ts = max([t for t in ts_candidates if t is not None], default=None)
+
     metrics = {
         "temperature": {
             "temp_now": temp_now,
             "temp_6h_avg": temp_6h_avg,
             "temp_24h_min": temp_24h_min,
             "temp_24h_max": temp_24h_max,
+            "temp_at": _iso_utc(temp_ts),
         },
         "soil_moisture": {
             "soil_now": _soil_pct(soil_now),
             "soil_24h_min": _soil_pct(soil_24h_min),
             "soil_24h_max": _soil_pct(soil_24h_max),
             "soil_24h_trend": soil_trend,
+            "soil_at": _iso_utc(soil_ts),
         },
         "light": {
             "light_now": light_now,
             "light_1h_avg": light_1h_avg,
             "light_today_sum": light_today_sum,
+            "light_at": _iso_utc(light_ts),
         },
         "weight": {
             "weight_now": weight_now,
@@ -185,6 +203,10 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
             "water_loss_per_hour": water_loss_per_hour,
             "hours_since_last_watering": hours_since_last_watering,
             "weight_drop_since_last_watering": weight_drop_since_last_watering,
+            "weight_at": _iso_utc(weight_ts),
+        },
+        "meta": {
+            "last_sensor_timestamp": _iso_utc(latest_ts),
         },
     }
     return metrics

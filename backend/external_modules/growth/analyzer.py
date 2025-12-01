@@ -10,6 +10,7 @@ from models import SensorRecord, WeightRecord
 # Thresholds for growth rate classification (grams per day)
 MIN_NORMAL_GROWTH = 0.2   # >= this: normal
 MIN_SLOW_GROWTH = 0.05    # 0 < rate < MIN_SLOW_GROWTH -> slow
+GROWTH_RATE_WINDOW_DAYS = 5  # use last N days to compute growth_rate_3d
 
 # Temperature range (°C) considered acceptable
 TEMP_OPT_LOW = 18.0
@@ -44,7 +45,7 @@ def analyze_growth(plant_id: int, db: Session) -> Dict:
       "debug": {...}
     }
     """
-    ref_points, fertilizer_events = _compute_daily_reference_points(plant_id, db, days=7)
+    ref_points, fertilizer_events = _compute_daily_reference_points(plant_id, db, days=GROWTH_RATE_WINDOW_DAYS)
     growth_rate_3d, delta_weight_1d = _compute_growth_rates(ref_points)
 
     sensor_24h = _compute_sensor_average(plant_id, db, hours=24)
@@ -113,7 +114,7 @@ def _compute_daily_reference_points(
             WeightRecord.weight,
             SensorRecord.soil_moisture,
         )
-        .join(
+        .outerjoin(
             SensorRecord,
             (SensorRecord.plant_id == WeightRecord.plant_id)
             & (SensorRecord.timestamp == WeightRecord.timestamp),

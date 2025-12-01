@@ -6,6 +6,8 @@
 - `.env` in `backend/` (copy `backend.env.example`):
   - `DB_URL` (Supabase Postgres URL or falls back to SQLite; `config.py` converts `postgres://` → `postgresql+psycopg2://`)
   - `SUPABASE_URL`, `SUPABASE_KEY`, optional `SUPABASE_PLANT_BUCKET`, `SUPABASE_DREAM_BUCKET`
+  - Coze 国际版：`COZE_API_TOKEN`, `COZE_WORKFLOW_ID`, 可选 `COZE_API_BASE`, `COZE_BOT_ID`, `COZE_APP_ID`
+  - Coze 中国区梦境工作流：`COZE_API_TOKEN_CN`, `COZE_WORKFLOW_ID_CN`, 可选 `COZE_API_BASE_CN`
 - Run: `cd backend && uvicorn app:app --reload`
 
 ## Routers (high level)
@@ -17,28 +19,35 @@
 - Analysis/Report: `/analysis/{id}`, `/report/{id}` (persists AnalysisResult text fields)
 - Dream garden: `/dreams` (create), `/dreams/{plant_id}` (list)
 - Metrics: `/metrics/{id}`, `/metrics/{id}/daily-7d`, `/metrics/{id}/hourly-24h` (soil moisture returned as %)
-- Alerts: `/alerts` (GET/POST), `/alerts/{id}` (DELETE)
+- Alerts: `/alerts` (GET/POST), `/alerts/{id}` (DELETE) — supports `plant_id`, `analysis_result_id`
+- Scheduler: `/scheduler/jobs`, `/scheduler/logs`, `/scheduler/jobs/{id}/pause|resume|run-now`
 - Admin/System: `/admin/stats`, `/system/overview`, `/dashboard/system-overview`
 
 ## Scheduler (apscheduler, `services/scheduler.py`)
-- Daily: growth analysis only (if recent data in last 24h).
-- Every 6h: analysis + LLM report + dream image (if recent data).
+- Daily: growth analysis only (recent data required).
+- Every 6h: split jobs ? LLM report, dream image (no forced run on startup).
+- Weekly: cleanup sensor/weight older than 30 days.
 - Post-watering: one-off full pipeline 1h later via `schedule_post_watering_job(plant_id)`.
-- Startup: triggers one immediate full pipeline run.
-- Scheduler starts in `app.py` and stops on shutdown.
+- Jobs metadata persisted in `scheduler_jobs`; runs logged in `scheduler_job_runs`; control via pause/resume/run-now endpoints.
 
 ## Supabase Storage
 - Buckets: `plant-images` (original photos), `dream-images` (dream garden).
 - Stored value in DB is the public URL; no local file paths are persisted.
 
 ## Data model deltas
-- `AnalysisResult`: `growth_status`, `growth_rate_3d`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis` (removed: leaf_health, symptoms, stress_factors, llm_report_*).
-- `DreamImage`: `file_path`, `description`, `created_at` (removed: info).
-- `Alert`: `id`, `message`, `created_at`.
+- `AnalysisResult`: `growth_status`, `growth_rate_3d`, `plant_type`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis`, `trigger`.
+- `DreamImage`: `file_path`, `description`, `created_at`.
+- `Alert`: `id`, `plant_id`, `analysis_result_id`, `message`, `created_at`.
+- Scheduler tables: `scheduler_jobs`, `scheduler_job_runs`.
 
 ## LLM I/O (vision + report)
 - Provide: `image_url`, `plant_id`, `nickname`, `sensor_data` (temp, light lux, soil_moisture %, weight), `growth_status`, `growth_rate_3d`, `stress_factors`, `metrics_snapshot` (from `/metrics/{plant_id}` key fields).
 - Expect: `plant_type`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis`, `alert`.
+
+## Dream workflow (Coze CN)
+- Call: `generate_dream_image_cn` with `.env` `COZE_API_TOKEN_CN` / `COZE_WORKFLOW_ID_CN` (optional `COZE_API_BASE_CN`).
+- Input (strings): `plant_id`, `temperature`, `light`, `soil_moisture`, `health_status` (can pass latest `analysis_results.full_analysis`).
+- Output: `output` (image string/URL per workflow), `msg`, and `raw_response` for debugging.
 
 ## Edge Collector (Pi)
 - Folder: `edge-collector/`

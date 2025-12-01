@@ -22,7 +22,8 @@
 - Images: `POST /upload_image` (multipart file → Supabase Storage; stores public URL).
 - Analysis/Report: `GET /analysis/{id}`, `GET /report/{id}` (writes AnalysisResult text fields).
 - Dreams: `POST /dreams`, `GET /dreams/{plant_id}` (Supabase URLs).
-- Alerts: `GET/POST /alerts`, `DELETE /alerts/{id}`.
+- Alerts: `GET/POST /alerts`, `DELETE /alerts/{id}` (supports `plant_id`, `analysis_result_id`).
+- Scheduler: `GET /scheduler/jobs`, `POST /scheduler/jobs/{id}/pause|resume|run-now`, `GET /scheduler/logs`.
 - System: `GET /admin/stats`, `GET /system/overview`, `GET /dashboard/system-overview`.
 
 ## Supabase Storage
@@ -31,9 +32,16 @@
 
 ## Scheduler (services/scheduler.py)
 - Daily analysis (recent data only).
-- Every 6h: analysis + LLM report + dream image.
+- Every 6h: split LLM report and dream image jobs; startup also triggers one full LLM+dream run.
+- Weekly cleanup of sensor/weight older than 30 days.
 - Post-watering one-off via `schedule_post_watering_job(plant_id, delay_minutes=60)`.
-- Startup triggers one full pipeline run; shuts down cleanly with app.
+- Jobs metadata in `scheduler_jobs`; run history in `scheduler_job_runs`; pause/resume/run-now via API.
+
+## Data model deltas
+- `AnalysisResult`: `growth_status`, `growth_rate_3d`, `plant_type`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis`.
+- `DreamImage`: `file_path`, `description`, `created_at`.
+- `Alert`: `id`, `plant_id`, `analysis_result_id`, `message`, `created_at`.
+- Scheduler tables: `scheduler_jobs`, `scheduler_job_runs`.
 
 ## LLM inputs/outputs
 - Provide: `image_url`, `plant_id`, `nickname`, `sensor_data` (temp, light lux, soil_moisture %, weight), `growth_status`, `growth_rate_3d`, `stress_factors`, `metrics_snapshot` (from `/metrics/{plant_id}`).

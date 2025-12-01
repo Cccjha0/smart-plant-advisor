@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -13,10 +13,14 @@ router = APIRouter()
 
 class AlertCreate(BaseModel):
     message: str
+    plant_id: Optional[int] = None
+    analysis_result_id: Optional[int] = None
 
 
 class AlertOut(BaseModel):
     id: int
+    plant_id: Optional[int]
+    analysis_result_id: Optional[int]
     message: str
     created_at: datetime
 
@@ -25,7 +29,12 @@ class AlertOut(BaseModel):
 
 @router.post("/alerts", response_model=AlertOut)
 def create_alert(payload: AlertCreate, db: Session = Depends(get_db)):
-    alert = Alert(message=payload.message, created_at=datetime.utcnow())
+    alert = Alert(
+        message=payload.message,
+        plant_id=payload.plant_id,
+        analysis_result_id=payload.analysis_result_id,
+        created_at=datetime.utcnow(),
+    )
     db.add(alert)
     db.commit()
     db.refresh(alert)
@@ -36,13 +45,15 @@ def create_alert(payload: AlertCreate, db: Session = Depends(get_db)):
 def list_alerts(
     db: Session = Depends(get_db),
     limit: int = Query(20, ge=1, le=200),
+    plant_id: Optional[int] = Query(None),
+    analysis_result_id: Optional[int] = Query(None),
 ):
-    alerts = (
-        db.query(Alert)
-        .order_by(Alert.created_at.desc())
-        .limit(limit)
-        .all()
-    )
+    query = db.query(Alert)
+    if plant_id is not None:
+        query = query.filter(Alert.plant_id == plant_id)
+    if analysis_result_id is not None:
+        query = query.filter(Alert.analysis_result_id == analysis_result_id)
+    alerts = query.order_by(Alert.created_at.desc()).limit(limit).all()
     return alerts
 
 
