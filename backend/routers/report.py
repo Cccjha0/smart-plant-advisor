@@ -233,6 +233,8 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
             pass
 
     plant_type = merged_output.get("plant_type")
+    if (plant_type is None or plant_type == "" or plant_type == "unknown") and plant.species:
+        plant_type = plant.species
     alert_msg = merged_output.get("alert")
     growth_overview = merged_output.get("growth_overview")
     environment_assessment = merged_output.get("environment_assessment")

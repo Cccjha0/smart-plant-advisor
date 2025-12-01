@@ -152,6 +152,8 @@ def _run_single_analysis_and_optionals(
         llm_short = llm_output.get("growth_overview") or llm_output.get("short_report")
         llm_long = llm_output.get("full_analysis") or llm_output.get("long_report")
         plant_type = llm_output.get("plant_type")
+        if (plant_type is None or plant_type == "" or plant_type == "unknown") and plant.species:
+            plant_type = plant.species
         alert_msg = llm_output.get("alert")
 
     analysis_record = AnalysisResult(
