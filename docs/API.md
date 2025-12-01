@@ -130,6 +130,21 @@ Base URL: `http://<host>:8000`
 ### GET /metrics/{plant_id}
 - Returns live metrics (now/averages/trends) for temp, soil, light, weight.
 
+### GET /plants/{plant_id}/latest-summary
+- Returns latest sensor snapshot and latest suggestions:
+```json
+{
+  "plant_id": 1,
+  "sensors": {
+    "temperature": { "value": 23.5, "timestamp": "2025-11-22T02:00:00Z" },
+    "light": { "value": 120.0, "timestamp": "2025-11-22T02:00:00Z" },
+    "soil_moisture": { "value": 55.1, "timestamp": "2025-11-22T02:00:00Z" },
+    "weight": { "value": 470.3, "timestamp": "2025-11-22T02:00:00Z" }
+  },
+  "suggestions": "text or null"
+}
+```
+
 ### GET /metrics/{plant_id}/daily-7d
 - Returns daily aggregates for the last 7 days (temperature, soil_moisture %, light, weight).
 
