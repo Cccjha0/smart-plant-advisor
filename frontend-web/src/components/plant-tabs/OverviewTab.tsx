@@ -7,16 +7,26 @@ export function OverviewTab({ plant }: { plant: Plant }) {
   const [analysis, setAnalysis] = useState<AnalysisDto | null>(null);
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
   const [loading, setLoading] = useState(true);
+  const [latestSuggestions, setLatestSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [a, m] = await Promise.all([
+        const [a, m, reports] = await Promise.all([
           api.getAnalysis(plant.id).catch(() => null),
           api.getMetricsDaily7d(plant.id).catch(() => ({ metrics: [] })),
+          api.getReports(plant.id, 1).catch(() => []),
         ]);
         setAnalysis(a);
         setDailyMetrics(m.metrics || []);
+        const firstReport = Array.isArray(reports) ? reports[0] : null;
+        const sugg = firstReport?.suggestions;
+        const suggList = Array.isArray(sugg)
+          ? sugg
+          : typeof sugg === 'string'
+            ? sugg.split('\n').map((s) => s.trim()).filter(Boolean)
+            : [];
+        setLatestSuggestions(suggList);
       } finally {
         setLoading(false);
       }
@@ -146,11 +156,15 @@ export function OverviewTab({ plant }: { plant: Plant }) {
 
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-900 mb-2">💡 今日建议</p>
-          <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-            <li>保持当前的浇水节奏，每 3-4 天浇水一次</li>
-            <li>确保植物接受充足的散射光，避免强光直射</li>
-            <li>定期检查土壤湿度，保持适度湿润</li>
-          </ul>
+          {latestSuggestions.length ? (
+            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+              {latestSuggestions.map((s, idx) => (
+                <li key={idx}>{s}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-blue-800">暂无最新建议，等待新的分析结果。</p>
+          )}
         </div>
       </div>
 

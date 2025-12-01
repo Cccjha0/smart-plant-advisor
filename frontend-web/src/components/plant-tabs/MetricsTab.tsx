@@ -29,6 +29,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
   const [rawData, setRawData] = useState<RawDataResponse | null>(null);
   const [rawLoading, setRawLoading] = useState(false);
   const [stressScores, setStressScores] = useState<Record<string, number> | null>(null);
+  const [growthRateSeries, setGrowthRateSeries] = useState<{ date: string; growth_rate_pct: number | null }[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -42,6 +43,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
         setDaily(d7.metrics || []);
         setHourly(h24.metrics || []);
         setStressScores(analytics?.stress_scores ?? null);
+        setGrowthRateSeries(analytics?.growth_rate_3d || []);
       } finally {
         setLoading(false);
       }
@@ -101,15 +103,10 @@ export function MetricsTab({ plantId }: { plantId: number }) {
   }, [timeRange, hourly, daily]);
 
   const growthRateData = useMemo(() => {
-    // 无专用增长率接口，这里简单用 weight 差分近似
-    return daily.map((m, idx) => {
-      const prev = daily[idx - 3];
-      const rate = prev && m.weight != null && prev.weight != null
-        ? ((m.weight - prev.weight) / Math.abs(prev.weight || 1)) * 100
-        : null;
-      return { date: m.date, rate };
-    }).filter((d) => d.rate != null);
-  }, [daily]);
+    return (growthRateSeries || [])
+      .map((item) => ({ date: item.date, rate: item.growth_rate_pct }))
+      .filter((d) => d.rate != null);
+  }, [growthRateSeries]);
 
   const stressFactors = useMemo(() => {
     const scoreFor = (key: string) => {
@@ -218,7 +215,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
           </div>
 
           <div>
-            <h3 className="text-gray-900 mb-4">3日生长率 (近似)</h3>
+            <h3 className="text-gray-900 mb-4">3日生长率</h3>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={growthRateData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
