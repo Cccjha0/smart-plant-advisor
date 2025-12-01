@@ -6,6 +6,8 @@ type ReportItem = {
   id: number;
   summary: string;
   content: string;
+  suggestions?: string | string[];
+  environment?: string;
   timestamp: string;
   trigger: string;
 };
@@ -16,6 +18,29 @@ export function ReportsTab({ plantId }: { plantId: number }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const loadReports = async () => {
+    try {
+      const res = await api.getReports(plantId, 20);
+      const items: ReportItem[] = (res || []).map((r: any) => ({
+        id: r.id,
+        summary: r.growth_overview || '报告',
+        content: r.full_analysis || r.growth_overview || '暂无内容',
+        suggestions: r.suggestions,
+        environment: r.environment_assessment,
+        timestamp: r.created_at || new Date().toISOString(),
+        trigger: 'history',
+      }));
+      setReports(items);
+      setSelectedReport(items[0] || null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    loadReports();
+  }, [plantId]);
+
   const fetchReport = async () => {
     try {
       const res = await api.getReport(plantId);
@@ -24,6 +49,8 @@ export function ReportsTab({ plantId }: { plantId: number }) {
         id: res.analysis_result_id || Date.now(),
         summary: res.report?.growth_overview || '报告',
         content: res.report?.full_analysis || res.report?.growth_overview || '暂无内容',
+        suggestions: res.report?.suggestions,
+        environment: res.report?.environment_assessment,
         timestamp: now,
         trigger: 'manual',
       };
@@ -33,10 +60,6 @@ export function ReportsTab({ plantId }: { plantId: number }) {
       console.error(e);
     }
   };
-
-  useEffect(() => {
-    setSelectedReport(reports[0] || null);
-  }, [reports]);
 
   const handleGenerateReport = async () => {
     setIsGenerating(true);
@@ -155,17 +178,32 @@ export function ReportsTab({ plantId }: { plantId: number }) {
             {selectedReport ? (
               <div className="prose max-w-none">
                 <div className="mb-6">
-                  <h3 className="text-gray-900 mb-2">今日生长情况概述</h3>
+                  <h3 className="text-gray-900 mb-2">今日生长情况概览</h3>
                   <p className="text-gray-700 leading-relaxed">
-                    {(selectedReport.content || '').split('\n\n')[0] || selectedReport.summary}
+                    {selectedReport.summary || selectedReport.content || '暂无内容'}
                   </p>
                 </div>
 
                 <div className="mb-6">
                   <h3 className="text-gray-900 mb-2">环境状态评价</h3>
                   <p className="text-gray-700 leading-relaxed">
-                    {(selectedReport.content || '').split('\n\n')[1] || selectedReport.summary}
+                    {selectedReport.environment || '暂无环境描述'}
                   </p>
+                </div>
+
+                <div className="mb-6">
+                  <h3 className="text-gray-900 mb-2">建议</h3>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <ul className="text-gray-700 space-y-2 list-disc list-inside">
+                      {(Array.isArray(selectedReport.suggestions)
+                        ? selectedReport.suggestions
+                        : (selectedReport.suggestions || '').split('\n')
+                      ).filter(Boolean).map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                      {!selectedReport.suggestions && <li>暂无建议</li>}
+                    </ul>
+                  </div>
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg">

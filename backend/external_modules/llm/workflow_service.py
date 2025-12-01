@@ -2,6 +2,7 @@
 工作流服务 - 调用Coze工作流API进行AI分析
 """
 import os
+import json
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
@@ -394,5 +395,76 @@ class WorkflowService:
                 else:
                     error_msg = f"工作流API调用失败（错误码: {e.code}）: {getattr(e, 'msg', error_msg)}"
             
+            raise Exception(error_msg)
+
+    def analyze_with_growth_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Call workflow with a full JSON payload (already merged metrics, sensors, stress).
+        Expected payload keys example:
+        {
+            "growth_rate_3d": ...,
+            "growth_status": ...,
+            "image_url": ...,
+            "metrics_snapshot": {...},
+            "nickname": ...,
+            "plant_id": ...,
+            "sensor_data": {...},
+            "stress_factors": {...}
+        }
+        """
+        if not self._is_configured:
+            raise ValueError("工作流API未配置。请设置 COZE_API_TOKEN 和 COZE_WORKFLOW_ID")
+
+        workflow_inputs = payload
+
+        try:
+            workflow_run = self._call_workflow_with_retry(workflow_inputs)
+            result_data = workflow_run.data if hasattr(workflow_run, 'data') else None
+            if result_data is None:
+                raise Exception("工作流返回数据为空")
+
+            if isinstance(result_data, str):
+                try:
+                    parsed_data = json.loads(result_data)
+                except json.JSONDecodeError:
+                    parsed_data = {"final_output": result_data}
+            elif isinstance(result_data, dict):
+                parsed_data = result_data
+            else:
+                parsed_data = {"final_output": str(result_data)}
+
+            final_output = parsed_data.get("final_output", "")
+
+            return {
+                "plant_type": parsed_data.get("plant_type"),
+                "growth_overview": parsed_data.get("growth_overview"),
+                "environment_assessment": parsed_data.get("environment_assessment"),
+                "suggestions": parsed_data.get("suggestions"),
+                "full_analysis": parsed_data.get("full_analysis") or final_output,
+                "alert": parsed_data.get("alert"),
+                "analysis_json": parsed_data.get("analysis_json"),
+                "raw_response": parsed_data,
+            }
+
+        except Exception as e:
+            error_msg = str(e)
+            if hasattr(e, 'code'):
+                if e.code == 700012006:
+                    msg = getattr(e, 'msg', '')
+                    if 'expired' in msg.lower():
+                        error_msg = f"访问令牌已过期（错误码: {e.code}）。请在Coze平台重新生成Token并更新.env中的COZE_API_TOKEN"
+                    elif 'invalid' in msg.lower():
+                        error_msg = f"访问令牌无效（错误码: {e.code}）。请检查Token是否正确，或重新生成Token。确保使用Personal Access Token"
+                    else:
+                        error_msg = f"访问令牌错误（错误码: {e.code}，{msg}）。请检查Token是否正确"
+                elif e.code == 720701013:
+                    error_msg = f"Coze服务器暂不可用（错误码: {e.code}）。请稍后重试。如问题持续，请联系Coze技术支持。"
+                elif e.code == 4200:
+                    error_msg = f"工作流未发布（错误码: {e.code}）。请在Coze平台发布工作流后再试。"
+                elif e.code == 4000:
+                    error_msg = f"请求参数错误（错误码: {e.code}）。请检查工作流参数定义。调试URL: {getattr(e, 'debug_url', 'N/A')}"
+                else:
+                    error_msg = f"工作流API调用失败（错误码: {e.code}，{getattr(e, 'msg', error_msg)}）"
+
             raise Exception(error_msg)
 

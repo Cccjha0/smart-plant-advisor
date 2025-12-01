@@ -24,6 +24,20 @@ export function OverviewTab({ plant }: { plant: Plant }) {
     load();
   }, [plant.id]);
 
+  const mapGrowthStatus = (status: string | null | undefined) => {
+    switch (status) {
+      case 'normal':
+        return 'healthy';
+      case 'slow':
+      case 'stagnant':
+        return 'slightly_stressed';
+      case 'stressed':
+        return 'stressed';
+      default:
+        return 'unknown';
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':
@@ -80,7 +94,7 @@ export function OverviewTab({ plant }: { plant: Plant }) {
     [dailyMetrics]
   );
 
-  const status = analysis?.growth_status || 'unknown';
+  const status = mapGrowthStatus(analysis?.growth_status);
 
   return (
     <div className="space-y-6">
@@ -97,15 +111,19 @@ export function OverviewTab({ plant }: { plant: Plant }) {
             <p className="text-gray-900">{plant.species || '未填写种类'}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">创建时间</p>
-            <p className="text-gray-900">—</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">最近浇水</p>
-            <p className="text-gray-900">—</p>
+              <p className="text-sm text-gray-500 mb-1">创建时间</p>
+              <p className="text-gray-900">
+                {plant.created_at ? new Date(plant.created_at).toLocaleString() : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 mb-1">最近浇水</p>
+              <p className="text-gray-900">
+                {plant.last_watered_at ? new Date(plant.last_watered_at).toLocaleString() : '—'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Status & Suggestions */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

@@ -13,6 +13,7 @@ class Plant(Base):
     species = Column(String, nullable=True)
     nickname = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    last_watered_at = Column(DateTime, nullable=True)
 
     images = relationship("ImageRecord", back_populates="plant")
     sensor_records = relationship("SensorRecord", back_populates="plant")
