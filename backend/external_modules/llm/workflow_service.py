@@ -30,6 +30,16 @@ class WorkflowService:
         self.workflow_id = os.getenv("COZE_WORKFLOW_ID")
         # 确保使用国际版API（如果未设置，默认使用国际版）
         self.coze_api_base = os.getenv("COZE_API_BASE", COZE_COM_BASE_URL)
+
+        # 中国区工作流（梦境图片）配置
+        self.coze_api_token_cn = os.getenv("COZE_API_TOKEN_CN")
+        self.workflow_id_cn = os.getenv("COZE_WORKFLOW_ID_CN")
+        self.coze_api_base_cn = os.getenv("COZE_API_BASE_CN", "https://api.coze.cn")
+
+        # 中国区工作流（梦境图片）配置：独立的 token / workflow / base url
+        self.coze_api_token_cn = os.getenv("COZE_API_TOKEN_CN")
+        self.workflow_id_cn = os.getenv("COZE_WORKFLOW_ID_CN")
+        self.coze_api_base_cn = os.getenv("COZE_API_BASE_CN", "https://api.coze.cn")
         
         # 如果误配置为中国区，强制使用国际版
         if "coze.cn" in self.coze_api_base:
@@ -50,10 +60,31 @@ class WorkflowService:
             auth=TokenAuth(token=self.coze_api_token),
             base_url=self.coze_api_base
         )
+
+        self.coze_cn = None
+        if self.coze_api_token_cn and self.workflow_id_cn:
+            try:
+                self.coze_cn = Coze(
+                    auth=TokenAuth(token=self.coze_api_token_cn),
+                    base_url=self.coze_api_base_cn,
+                )
+            except Exception as e:
+                print(f"警告: 初始化中国区 Coze 客户端失败，将跳过 CN 工作流。err={e}")
+                self.coze_cn = None
         
         self._is_configured = True
     
-    def _call_workflow_with_retry(self, workflow_inputs: Dict[str, Any], max_retries: int = 3, retry_delay: int = 2):
+    def _call_workflow_with_retry(
+        self,
+        workflow_inputs: Dict[str, Any],
+        max_retries: int = 3,
+        retry_delay: int = 2,
+        *,
+        workflow_id: Optional[str] = None,
+        coze_client=None,
+        bot_id: Optional[str] = None,
+        app_id: Optional[str] = None,
+    ):
         """
         调用工作流，带重试机制（处理VPN不稳定问题）
         
@@ -61,19 +92,27 @@ class WorkflowService:
             workflow_inputs: 工作流输入参数
             max_retries: 最大重试次数
             retry_delay: 重试延迟（秒）
+            workflow_id: 覆盖默认工作流ID
+            coze_client: 覆盖默认Coze客户端
+            bot_id/app_id: 覆盖默认bot/app
             
         Returns:
             WorkflowRunResult对象
         """
         import time
+
+        wf_id = workflow_id or self.workflow_id
+        client = coze_client or self.coze
+        bot = bot_id if bot_id is not None else self.bot_id
+        app = app_id if app_id is not None else self.app_id
         
         for attempt in range(max_retries):
             try:
-                workflow_run = self.coze.workflows.runs.create(
-                    workflow_id=self.workflow_id,
+                workflow_run = client.workflows.runs.create(
+                    workflow_id=wf_id,
                     parameters=workflow_inputs,
-                    bot_id=self.bot_id if self.bot_id else None,
-                    app_id=self.app_id if self.app_id else None,
+                    bot_id=bot if bot else None,
+                    app_id=app if app else None,
                 )
                 return workflow_run
             except CozeAPIError as e:
@@ -128,8 +167,62 @@ class WorkflowService:
         light = sensor_data.get("light") or sensor_data.get("avg_light")
         if light is not None:
             parts.append(f"light={light}")
-        
+
         return ", ".join(parts)
+
+    def generate_dream_image_cn(self, payload: Dict[str, str]) -> Dict[str, Any]:
+        """
+        调用中国区 Coze 梦境花园工作流。
+
+        预期输入字段（全部字符串）:
+          - plant_id
+          - temperature
+          - light
+          - soil_moisture
+          - health_status
+
+        返回字段:
+          - output: 图片（字符串，取决于工作流定义，例如 base64 或 URL）
+          - msg: 文本提示
+          - raw_response: 原始返回，便于调试
+        """
+        if not (self.coze_cn and self.workflow_id_cn):
+            raise ValueError("中国区 Coze 工作流未配置，请设置 COZE_API_TOKEN_CN / COZE_WORKFLOW_ID_CN")
+
+        workflow_inputs = {
+            "plant_id": str(payload.get("plant_id", "")),
+            "temperature": str(payload.get("temperature", "")),
+            "light": str(payload.get("light", "")),
+            "soil_moisture": str(payload.get("soil_moisture", "")),
+            "health_status": str(payload.get("health_status", "")),
+        }
+
+        workflow_run = self._call_workflow_with_retry(
+            workflow_inputs,
+            workflow_id=self.workflow_id_cn,
+            coze_client=self.coze_cn,
+            bot_id=None,
+            app_id=None,
+        )
+
+        result_data = workflow_run.data if hasattr(workflow_run, "data") else None
+        if result_data is None:
+            raise Exception("梦境工作流返回数据为空")
+
+        if isinstance(result_data, dict):
+            output = result_data.get("output")
+            msg = result_data.get("msg")
+            parsed = result_data
+        else:
+            output = None
+            msg = str(result_data)
+            parsed = {"raw": result_data}
+
+        return {
+            "output": output,
+            "msg": msg,
+            "raw_response": parsed,
+        }
     
     def analyze_plant(
         self,
