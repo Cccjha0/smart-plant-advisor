@@ -53,7 +53,7 @@ class LLMService:
 
         # Mock fallback
         self.logger.info("LLMService.generate: using mock fallback.")
-    plant_type = analysis_payload.get("plant_type") or "your plant"
+        plant_type = analysis_payload.get("plant_type") or "your plant"
         growth_status = analysis_payload.get("growth_status") or "normal"
 
         growth_overview = f"Growth status: {growth_status}. Trending stable."
