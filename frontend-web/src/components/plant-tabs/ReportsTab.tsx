@@ -9,7 +9,7 @@ type ReportItem = {
   suggestions?: string | string[];
   environment?: string;
   timestamp: string;
-  trigger: string;
+  trigger: 'scheduled' | 'watering' | 'manual' | 'default' | 'history' | 'unknown';
 };
 
 export function ReportsTab({ plantId }: { plantId: number }) {
@@ -28,7 +28,7 @@ export function ReportsTab({ plantId }: { plantId: number }) {
         suggestions: r.suggestions,
         environment: r.environment_assessment,
         timestamp: r.created_at || new Date().toISOString(),
-        trigger: 'history',
+        trigger: (r.trigger as ReportItem['trigger']) || 'history',
       }));
       setReports(items);
       setSelectedReport(items[0] || null);
@@ -52,7 +52,7 @@ export function ReportsTab({ plantId }: { plantId: number }) {
         suggestions: res.report?.suggestions,
         environment: res.report?.environment_assessment,
         timestamp: now,
-        trigger: 'manual',
+        trigger: (res.report?.trigger as ReportItem['trigger']) || 'manual',
       };
       setReports([item, ...reports]);
       setSelectedReport(item);
@@ -82,6 +82,8 @@ export function ReportsTab({ plantId }: { plantId: number }) {
         return 'bg-green-100 text-green-700 border-green-200';
       case 'manual':
         return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'history':
+        return 'bg-gray-100 text-gray-700 border-gray-200';
       default:
         return 'bg-gray-100 text-gray-700 border-gray-200';
     }
@@ -95,6 +97,8 @@ export function ReportsTab({ plantId }: { plantId: number }) {
         return '浇水后';
       case 'manual':
         return '手动触发';
+      case 'history':
+        return '历史记录';
       default:
         return '未知';
     }

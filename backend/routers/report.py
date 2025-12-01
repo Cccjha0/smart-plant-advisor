@@ -254,6 +254,7 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
         growth_status=analysis_payload["growth_status"],
         growth_rate_3d=analysis_payload["growth_rate_3d"],
         plant_type=plant_type,
+        trigger="manual",
         growth_overview=growth_overview,
         environment_assessment=environment_assessment,
         suggestions=suggestions_val,
@@ -332,6 +333,7 @@ def list_reports(plant_id: int, limit: int = 20, db: Session = Depends(get_db)):
             "suggestions": r.suggestions,
             "full_analysis": r.full_analysis,
             "created_at": r.created_at.isoformat() if r.created_at else None,
+            "trigger": r.trigger or "default",
         }
         for r in rows
     ]
