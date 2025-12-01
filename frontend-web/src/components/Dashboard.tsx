@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Leaf, Activity, AlertTriangle, Image, Search, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react';
-import { api, AlertDto, DashboardOverview, Plant, DreamDto } from '../utils/api';
+import { api, AlertDto, DashboardOverview, Plant, DreamDto, AnalysisDto, MetricsDto } from '../utils/api';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [analysisMap, setAnalysisMap] = useState<Record<number, AnalysisDto | null>>({});
+  const [metricsMap, setMetricsMap] = useState<Record<number, MetricsDto | null>>({});
+  const [dreamMap, setDreamMap] = useState<Record<number, DreamDto | null>>({});
   const [stats, setStats] = useState<DashboardOverview | null>(null);
   const [alerts, setAlerts] = useState<AlertDto[]>([]);
-  const [dreams, setDreams] = useState<DreamDto[]>([]);
+  const [dreams, setDreams] = useState<(DreamDto & { nickname?: string | null })[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,9 +28,18 @@ export function Dashboard() {
         setPlants(plantsRes || []);
         setAlerts(alertsRes || []);
 
-        const firstIds = (plantsRes || []).slice(0, 4).map((p) => p.id);
-        const dreamLists = await Promise.all(firstIds.map((id) => api.getDreamsByPlant(id).catch(() => [])));
-        const merged = dreamLists.flat().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 4);
+        const firstPlants = (plantsRes || []).slice(0, 4);
+        const dreamLists = await Promise.all(
+          firstPlants.map((p) =>
+            api.getDreamsByPlant(p.id)
+              .then((ds) => ds.map((d) => ({ ...d, nickname: p.nickname })))
+              .catch(() => []),
+          ),
+        );
+        const merged = dreamLists
+          .flat()
+          .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          .slice(0, 4);
         setDreams(merged);
       } finally {
         setLoading(false);
@@ -36,6 +48,37 @@ export function Dashboard() {
     load();
   }, []);
 
+  useEffect(() => {
+    const loadPerPlantData = async () => {
+      if (!plants.length) {
+        setAnalysisMap({});
+        setMetricsMap({});
+        setDreamMap({});
+        return;
+      }
+      const entries = await Promise.all(
+        plants.map(async (p) => {
+          const [analysis, metrics, dreams] = await Promise.all([
+            api.getAnalysis(p.id).catch(() => null),
+            api.getMetrics(p.id).catch(() => null),
+            api.getDreamsByPlant(p.id).catch(() => [] as DreamDto[]),
+          ]);
+          return {
+            id: p.id,
+            analysis,
+            metrics,
+            dream: dreams[0] ?? null,
+          };
+        }),
+      );
+
+      setAnalysisMap(Object.fromEntries(entries.map((e) => [e.id, e.analysis])));
+      setMetricsMap(Object.fromEntries(entries.map((e) => [e.id, e.metrics])));
+      setDreamMap(Object.fromEntries(entries.map((e) => [e.id, e.dream])));
+    };
+    loadPerPlantData();
+  }, [plants]);
+
   const filteredPlants = useMemo(() => {
     return plants.filter((plant) => {
       const nickname = plant.nickname || '';
@@ -43,10 +86,11 @@ export function Dashboard() {
       const matchesSearch =
         nickname.toLowerCase().includes(searchTerm.toLowerCase()) ||
         species.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesFilter = filterStatus === 'all';
+      const status = mapGrowthStatus(analysisMap[plant.id]?.growth_status);
+      const matchesFilter = filterStatus === 'all' || status === filterStatus;
       return matchesSearch && matchesFilter;
     });
-  }, [plants, searchTerm, filterStatus]);
+  }, [plants, searchTerm, filterStatus, analysisMap]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -78,6 +122,20 @@ export function Dashboard() {
     if (rate > 0.5) return <TrendingUp className="w-4 h-4 text-green-600" />;
     if (rate < -0.5) return <TrendingDown className="w-4 h-4 text-red-600" />;
     return <Minus className="w-4 h-4 text-gray-600" />;
+  };
+
+  const timeAgo = (iso?: string | null) => {
+    if (!iso) return '—';
+    const normalized = /[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`;
+    const ts = new Date(normalized).getTime();
+    if (Number.isNaN(ts)) return '—';
+    const diffSec = Math.max(0, (Date.now() - ts) / 1000);
+    if (diffSec < 60) return '刚刚';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} 分钟前`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} 小时前`;
+    const days = Math.floor(diffSec / 86400);
+    if (days < 30) return `${days} 天前`;
+    return new Date(iso).toLocaleDateString();
   };
 
   return (
@@ -150,7 +208,11 @@ export function Dashboard() {
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
-                    <option value="all">全部状态</option>
+                <option value="all">全部状态</option>
+                    <option value="healthy">健康</option>
+                    <option value="slightly_stressed">轻微压力</option>
+                    <option value="stressed">严重压力</option>
+                    <option value="unknown">数据不足</option>
                   </select>
                 </div>
               </div>
@@ -160,46 +222,68 @@ export function Dashboard() {
                 {!loading && filteredPlants.length === 0 && (
                   <div className="p-6 text-gray-500">暂无植物</div>
                 )}
-                {filteredPlants.map((plant) => (
-                  <div
-                    key={plant.id}
-                    onClick={() => navigate(`/plants/${plant.id}`)}
-                    className="p-6 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                          <Leaf className="w-6 h-6 text-green-600" />
+                {filteredPlants.map((plant) => {
+                  const analysis = analysisMap[plant.id];
+                  const status = mapGrowthStatus(analysis?.growth_status);
+                  const growthRate =
+                    typeof analysis?.growth_rate_3d === 'number' && Number.isFinite(analysis.growth_rate_3d)
+                      ? analysis.growth_rate_3d
+                      : null;
+                  const metrics = metricsMap[plant.id];
+                  const dream = dreamMap[plant.id];
+                  const latestTimestamp =
+                    metrics?.meta?.last_sensor_timestamp ||
+                    metrics?.weight?.weight_at ||
+                    metrics?.temperature?.temp_at ||
+                    metrics?.soil_moisture?.soil_at ||
+                    metrics?.light?.light_at;
+                  const latestDataText = metrics
+                    ? `${timeAgo(latestTimestamp)} · ${metrics.temperature.temp_now ?? '—'}°C / ${metrics.soil_moisture.soil_now ?? '—'}% / ${metrics.weight.weight_now ?? '—'}g`
+                    : '—';
+                  const latestDreamText = dream?.created_at ? timeAgo(dream.created_at) : '—';
+                  return (
+                    <div
+                      key={plant.id}
+                      onClick={() => navigate(`/plants/${plant.id}`)}
+                      className="p-6 hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <Leaf className="w-6 h-6 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-gray-900">{plant.nickname || '未命名'}</h3>
+                            <p className="text-sm text-gray-500">{plant.species || '未填写种类'}</p>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(status)}`}>
+                          {getStatusText(status)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">最近数据</p>
+                          <p className="text-gray-900">{latestDataText}</p>
                         </div>
                         <div>
-                          <h3 className="text-gray-900">{plant.nickname || '未命名'}</h3>
-                          <p className="text-sm text-gray-500">{plant.species || '未填写种类'}</p>
+                          <p className="text-gray-500">最近梦境</p>
+                          <p className="text-gray-900">{latestDreamText}</p>
                         </div>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-sm border ${getStatusColor('unknown')}`}>
-                        {getStatusText('unknown')}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-500">最近数据</p>
-                        <p className="text-gray-900">—</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">最近梦境</p>
-                        <p className="text-gray-900">—</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">生长率</p>
-                        <div className="flex items-center gap-1">
-                          {getGrowthIcon(0)}
-                          <span className="text-gray-900">—</span>
+                        <div>
+                          <p className="text-gray-500">生长率</p>
+                          <div className="flex items-center gap-1">
+                            {getGrowthIcon(growthRate ?? 0)}
+                            <span className="text-gray-900">
+                              {growthRate != null ? `${growthRate.toFixed(1)}%` : '—'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -235,7 +319,7 @@ export function Dashboard() {
                         <Sparkles className="w-8 h-8 text-purple-400" />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-600">Plant #{dream.plant_id}</p>
+                    <p className="text-xs text-gray-600">{dream.nickname || `Plant #${dream.plant_id}`}</p>
                     <p className="text-xs text-gray-400">{new Date(dream.created_at).toLocaleString()}</p>
                   </div>
                 ))}
@@ -256,3 +340,16 @@ export function Dashboard() {
     </div>
   );
 }
+  const mapGrowthStatus = (status: string | null | undefined) => {
+    switch (status) {
+      case 'normal':
+        return 'healthy';
+      case 'slow':
+      case 'stagnant':
+        return 'slightly_stressed';
+      case 'stressed':
+        return 'stressed';
+      default:
+        return 'unknown';
+    }
+  };

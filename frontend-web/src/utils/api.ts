@@ -8,6 +8,14 @@ async function fetchJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function fetchText(path: string): Promise<string> {
+  const res = await fetch(`${API_BASE}${path}`);
+  if (!res.ok) {
+    throw new Error(`Request failed: ${res.status}`);
+  }
+  return res.text();
+}
+
 export type DashboardOverview = {
   total_plants: number;
   active_last_24h: number;
@@ -27,6 +35,8 @@ export type Plant = {
   id: number;
   nickname: string | null;
   species: string | null;
+  created_at?: string;
+  last_watered_at?: string | null;
 };
 
 export type AlertDto = {
@@ -51,17 +61,20 @@ export type MetricsDto = {
     temp_6h_avg: number | null;
     temp_24h_min: number | null;
     temp_24h_max: number | null;
+    temp_at?: string | null;
   };
   soil_moisture: {
     soil_now: number | null;
     soil_24h_min: number | null;
     soil_24h_max: number | null;
     soil_24h_trend: number | null;
+    soil_at?: string | null;
   };
   light: {
     light_now: number | null;
     light_1h_avg: number | null;
     light_today_sum: number | null;
+    light_at?: string | null;
   };
   weight: {
     weight_now: number | null;
@@ -69,6 +82,10 @@ export type MetricsDto = {
     water_loss_per_hour: number | null;
     hours_since_last_watering: number | null;
     weight_drop_since_last_watering: number | null;
+    weight_at?: string | null;
+  };
+  meta?: {
+    last_sensor_timestamp?: string | null;
   };
 };
 
@@ -127,6 +144,23 @@ export type SchedulerLogDto = {
   durationSeconds: number | null;
 };
 
+export type RawDataRecord = {
+  timestamp: string;
+  time_label?: string;
+  value: number | null;
+};
+
+export type RawDataResponse = {
+  plant_id: number;
+  sensor_type: string;
+  unit: string | null;
+  date?: string | null;
+  page: number;
+  page_size: number;
+  total: number;
+  records: RawDataRecord[];
+};
+
 export const api = {
   getDashboardOverview: async () => {
     // Try dashboard view first; fallback to system overview if unavailable
@@ -151,9 +185,20 @@ export const api = {
   getMetricsHourly24h: (plantId: number) => fetchJson<{ metrics: HourlyMetric[] }>(`/metrics/${plantId}/hourly-24h`),
   getAnalysis: (plantId: number) => fetchJson<AnalysisDto>(`/analysis/${plantId}`),
   getReport: (plantId: number) => fetchJson<any>(`/report/${plantId}`),
+  getReports: (plantId: number, limit = 20) => fetchJson<any[]>(`/reports/${plantId}?limit=${limit}`),
   getGrowthAnalytics: (plantId: number) => fetchJson<GrowthAnalysisDto>(`/plants/${plantId}/growth-analytics?days=7`),
   getImagesByPlant: (plantId: number, limit = 50) => fetchJson<any[]>(`/images?plant_id=${plantId}&limit=${limit}`),
   getAdminStats: () => fetchJson<any>('/admin/stats'),
   getSchedulerJobs: () => fetchJson<SchedulerJobDto[]>('/scheduler/jobs'),
   getSchedulerLogs: (limit = 50) => fetchJson<SchedulerLogDto[]>(`/scheduler/logs?limit=${limit}`),
+  getRawData: (plantId: number, sensorType: string, page = 1, pageSize = 25) =>
+    fetchJson<RawDataResponse>(
+      `/plants/${plantId}/raw-data?sensor_type=${sensorType}&page=${page}&page_size=${pageSize}`,
+    ),
+  exportRawDataCsv: (plantId: number, sensorType: string, date?: string) => {
+    const query = [`sensor_type=${sensorType}`];
+    if (date) query.push(`date=${encodeURIComponent(date)}`);
+    const qs = query.join('&');
+    return fetchText(`/plants/${plantId}/raw-data/export?${qs}`);
+  },
 };
