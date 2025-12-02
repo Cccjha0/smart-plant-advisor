@@ -32,7 +32,7 @@ class SmartPlantFrame(ctk.CTk):
 
     def start_clock(self):
         def update():
-            t = datetime.now().strftime("%Y年%m月%d日 %H:%M:%S")
+            t = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
             try:
                 self.data_mode.time_lbl.configure(text=t)
             except:
@@ -41,9 +41,9 @@ class SmartPlantFrame(ctk.CTk):
         update()
 
 if __name__ == "__main__":
+    app = SmartPlantFrame()
     try:
-        app = SmartPlantFrame()
         app.mainloop()
     finally:
         import RPi.GPIO as GPIO
-        GPIO.cleanup()
+        GPIO.cleanup()   # 延迟导入 + try-finally，彻底无警告
