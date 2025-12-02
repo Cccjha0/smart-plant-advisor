@@ -25,7 +25,7 @@ def _build_environment(db: Session, dream: DreamImageRecord) -> dict:
     """
     Build environment info from linked sensor/weight records.
     """
-    temp = light = soil = weight = None
+    temp = light = soil_raw = soil_pct = weight = None
     if dream.sensor_record_id:
         sensor = (
             db.query(SensorRecord)
@@ -35,7 +35,9 @@ def _build_environment(db: Session, dream: DreamImageRecord) -> dict:
         if sensor:
             temp = sensor.temperature
             light = sensor.light
-            soil = sensor.soil_moisture
+            soil_raw = sensor.soil_moisture
+            if soil_raw is not None:
+                soil_pct = (255.0 - soil_raw) / 255.0 * 100.0
     if dream.weight_record_id:
         w = (
             db.query(WeightRecord)
@@ -47,7 +49,8 @@ def _build_environment(db: Session, dream: DreamImageRecord) -> dict:
     return {
         "temperature": temp,
         "light": light,
-        "moisture": soil,
+        "moisture": soil_pct,
+        "moisture_raw": soil_raw,
         "weight": weight,
     }
 

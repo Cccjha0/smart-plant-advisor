@@ -130,7 +130,12 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <p className="text-xs text-gray-500">湿度</p>
-                      <p className="text-lg text-gray-900">{selectedDream.environment.moisture ?? '—'}%</p>
+                    <p className="text-lg text-gray-900">
+                      {selectedDream.environment.moisture ?? '—'}%
+                      {selectedDream.environment.moisture_raw != null && (
+                        <span className="text-xs text-gray-500 ml-1">(raw {selectedDream.environment.moisture_raw})</span>
+                      )}
+                    </p>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <p className="text-xs text-gray-500">光照</p>

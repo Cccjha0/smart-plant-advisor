@@ -56,6 +56,7 @@ export type DreamDto = {
   environment?: {
     temperature: number | null;
     moisture: number | null;
+    moisture_raw?: number | null;
     light: number | null;
     weight: number | null;
   } | null;
