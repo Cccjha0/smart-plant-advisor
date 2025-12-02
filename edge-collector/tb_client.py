@@ -3,10 +3,11 @@ import requests
 import json
 from pathlib import Path
 from utils import log
-
+from dotenv import load_dotenv
 # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
 # 第一步：在这里填你设备的 Access Token（只填一次！）
-TB_ACCESS_TOKEN = "qcw9jm9ev86ij1ifj928"   # ←←← 必填！！！
+load_dotenv()
+TB_ACCESS_TOKEN = os.environ["TB_ACCESS_TOKEN"]   # ←←← 必填！！！
 # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
 
 TB_URL = f"https://thingsboard.cloud/api/v1/{TB_ACCESS_TOKEN}/telemetry"
