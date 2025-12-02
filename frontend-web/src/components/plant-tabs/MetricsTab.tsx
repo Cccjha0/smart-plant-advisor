@@ -65,7 +65,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
   }, [plantId, rawSensor]);
 
   const defaultUnit: Record<typeof rawSensor, string> = {
-    temperature: '°C',
+    temperature: 'degC',
     soil_moisture: '%',
     light: 'lux',
     weight: 'g',
