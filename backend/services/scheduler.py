@@ -45,11 +45,6 @@ JOB_METADATA = {
         "description": "每周清理30天前的旧传感器数据",
         "cron_expr": "0 2 * * 0",
     },
-    "periodic_llm_and_dream": {
-        "name": "6小时LLM+梦境",
-        "description": "每6小时生成一次 LLM 报告并生成梦境图（仅启动时手动触发）",
-        "cron_expr": "0 */6 * * *",
-    },
     "post_watering": {
         "name": "浇水后一次性任务",
         "description": "浇水后 1 小时运行一次完整管线",
@@ -476,7 +471,6 @@ def run_job_now(job_key: str):
         "periodic_llm_report": run_periodic_llm_report,
         "periodic_dream_image": run_periodic_dream_image,
         "weekly_data_cleanup": run_weekly_data_cleanup,
-        "periodic_llm_and_dream": run_periodic_llm_and_dream,
     }
     fn = fn_map.get(job_key)
     if fn:
