@@ -65,7 +65,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
   }, [plantId, rawSensor]);
 
   const defaultUnit: Record<typeof rawSensor, string> = {
-    temperature: 'C',
+    temperature: '°C',
     soil_moisture: '%',
     light: 'lux',
     weight: 'g',
@@ -79,7 +79,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
 
   const formatUnit = (u?: string | null) => {
     if (!u) return '';
-    return u.replace('Â', '').replace('°C', 'C').replace('°', 'C');
+    return u.replace('Â', '');
   };
 
   const toggleLine = (key: keyof typeof visibleLines) => {
