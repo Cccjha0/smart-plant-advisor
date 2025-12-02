@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict
 
 from config import SUPABASE_DREAM_BUCKET
 from database import get_db
-from models import DreamImageRecord, Plant
+from models import DreamImageRecord, Plant, SensorRecord, WeightRecord, AnalysisResult
 from services.llm_service import LLMService
 from services.storage import upload_bytes
 
@@ -18,10 +18,6 @@ llm_service = LLMService()
 
 class DreamCreate(BaseModel):
     plant_id: int
-    temperature: Optional[float] = None
-    light: Optional[float] = None
-    soil_moisture: Optional[float] = None
-    health_status: Optional[str] = None
 
 
 class DreamOut(BaseModel):
@@ -40,38 +36,75 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
     if not plant:
         raise HTTPException(status_code=400, detail=f"Plant {payload.plant_id} does not exist.")
 
+    # Gather latest sensor/weight and analysis as defaults
+    def _latest_sensor(column):
+        row = (
+            db.query(column, SensorRecord.timestamp)
+            .filter(SensorRecord.plant_id == payload.plant_id, column.isnot(None))
+            .order_by(SensorRecord.timestamp.desc())
+            .first()
+        )
+        return (row[0], row[1]) if row else (None, None)
+
+    def _latest_weight():
+        row = (
+            db.query(WeightRecord.weight, WeightRecord.timestamp)
+            .filter(WeightRecord.plant_id == payload.plant_id, WeightRecord.weight.isnot(None))
+            .order_by(WeightRecord.timestamp.desc())
+            .first()
+        )
+        return (row[0], row[1]) if row else (None, None)
+
+    temp_val, _ = _latest_sensor(SensorRecord.temperature)
+    light_val, _ = _latest_sensor(SensorRecord.light)
+    soil_val, _ = _latest_sensor(SensorRecord.soil_moisture)
+    weight_val, _ = _latest_weight()
+
+    latest_analysis = (
+        db.query(AnalysisResult)
+        .filter(AnalysisResult.plant_id == payload.plant_id)
+        .order_by(AnalysisResult.created_at.desc())
+        .first()
+    )
+    health_status_val = latest_analysis.full_analysis if latest_analysis else None
+
     sensor_payload = {
-        "temperature": payload.temperature,
-        "light": payload.light,
-        "soil_moisture": payload.soil_moisture,
-        "health_status": payload.health_status,
+        "temperature": temp_val,
+        "light": light_val,
+        "soil_moisture": soil_val,
+        "weight": weight_val,
+        "health_status": health_status_val,
     }
 
     dream_result = llm_service.generate_dream_image(payload.plant_id, sensor_payload)
     dream_bytes = dream_result.get("data")
     ext = dream_result.get("ext", "png")
     description = dream_result.get("describe") or dream_result.get("description")
+    url = dream_result.get("url")
 
-    if not dream_bytes:
+    if not dream_bytes and not url:
         raise HTTPException(status_code=500, detail="dream image generation failed")
 
-    ts = int(datetime.utcnow().timestamp())
-    ext_clean = ext.lstrip(".") or "png"
-    storage_path = f"{payload.plant_id}/{ts}.{ext_clean}"
+    file_path = url
+    if dream_bytes:
+        ts = int(datetime.utcnow().timestamp())
+        ext_clean = ext.lstrip(".") or "png"
+        storage_path = f"{payload.plant_id}/{ts}.{ext_clean}"
 
-    try:
-        public_url = upload_bytes(
-            SUPABASE_DREAM_BUCKET,
-            storage_path,
-            dream_bytes,
-            f"image/{ext_clean}",
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"upload failed: {exc}") from exc
+        try:
+            public_url = upload_bytes(
+                SUPABASE_DREAM_BUCKET,
+                storage_path,
+                dream_bytes,
+                f"image/{ext_clean}",
+            )
+            file_path = public_url
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"upload failed: {exc}") from exc
 
     record = DreamImageRecord(
         plant_id=payload.plant_id,
-        file_path=public_url,
+        file_path=file_path,
         description=description,
         created_at=datetime.utcnow(),
     )
