@@ -201,8 +201,8 @@ class WorkflowService:
         workflow_inputs = dict(payload)
         if workflow_inputs.get("image_url") in ("", None):
             workflow_inputs.pop("image_url", None)
-        # Log keys for debugging input shape
-        print(f"[CozePayload] keys={list(workflow_inputs.keys())}")
+        # Log keys and payload for debugging input shape
+        print(f"[CozePayload] keys={list(workflow_inputs.keys())} payload={workflow_inputs}")
 
         try:
             workflow_run = self._call_workflow_with_retry(workflow_inputs)

@@ -35,6 +35,13 @@ class LLMService:
                 self.logger.info("LLMService.generate: using workflow_service with full payload JSON")
                 def _str_or_blank(v):
                     return "" if v is None else str(v)
+                import json
+
+                def _dump_obj(obj: Any) -> str:
+                    try:
+                        return json.dumps(obj or {}, ensure_ascii=False)
+                    except Exception:
+                        return "{}"
                 growth_rate_val = analysis_payload.get("growth_rate_3d")
                 growth_rate_str = str(growth_rate_val) if growth_rate_val is not None else "0"
                 growth_status_str = _str_or_blank(analysis_payload.get("growth_status")) or "unknown"
@@ -43,11 +50,11 @@ class LLMService:
                 base_payload = {
                     "growth_rate_3d": growth_rate_str,
                     "growth_status": growth_status_str,
-                    "metrics_snapshot": analysis_payload.get("metrics_snapshot") or {},
+                    "metrics_snapshot": _dump_obj(analysis_payload.get("metrics_snapshot")),
                     "nickname": _str_or_blank(analysis_payload.get("nickname")) or "unknown",
                     "plant_id": _str_or_blank(analysis_payload.get("plant_id")) or "unknown",
-                    "sensor_data": analysis_payload.get("sensor_data") or {},
-                    "stress_factors": analysis_payload.get("stress_factors") or {},
+                    "sensor_data": _dump_obj(analysis_payload.get("sensor_data")),
+                    "stress_factors": _dump_obj(analysis_payload.get("stress_factors")),
                 }
                 if image_url_val:
                     base_payload["image_url"] = image_url_val
