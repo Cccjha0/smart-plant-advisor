@@ -132,6 +132,12 @@ def _run_single_analysis_and_optionals(
         "growth_rate_3d": growth_result.get("growth_rate_3d"),
         "sensor_summary_7d": sensor_summary_7d,
         "stress_factors": growth_result.get("stress_factors", []),
+        # Fields expected by LLM workflow
+        "plant_id": str(plant_id),
+        "nickname": plant.nickname or f"Plant #{plant_id}",
+        "image_url": None,
+        "metrics_snapshot": {},
+        "sensor_data": {},
     }
 
     llm_short = None
