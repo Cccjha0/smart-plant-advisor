@@ -23,8 +23,8 @@ export function ReportsTab({ plantId }: { plantId: number }) {
       const res = await api.getReports(plantId, 20);
       const items: ReportItem[] = (res || []).map((r: any) => ({
         id: r.id,
-        summary: r.growth_overview || '报告',
-        content: r.full_analysis || r.growth_overview || '暂无内容',
+        summary: r.growth_overview || 'Report',
+        content: r.full_analysis || r.growth_overview || 'No content',
         suggestions: r.suggestions,
         environment: r.environment_assessment,
         timestamp: r.created_at || new Date().toISOString(),
@@ -47,8 +47,8 @@ export function ReportsTab({ plantId }: { plantId: number }) {
       const now = new Date().toISOString();
       const item: ReportItem = {
         id: res.analysis_result_id || Date.now(),
-        summary: res.report?.growth_overview || '报告',
-        content: res.report?.full_analysis || res.report?.growth_overview || '暂无内容',
+        summary: res.report?.growth_overview || 'Report',
+        content: res.report?.full_analysis || res.report?.growth_overview || 'No content',
         suggestions: res.report?.suggestions,
         environment: res.report?.environment_assessment,
         timestamp: now,
@@ -92,15 +92,15 @@ export function ReportsTab({ plantId }: { plantId: number }) {
   const getTriggerText = (trigger: string) => {
     switch (trigger) {
       case 'scheduled':
-        return '定时任务';
+        return 'Scheduled';
       case 'watering':
-        return '浇水后';
+        return 'After watering';
       case 'manual':
-        return '手动触发';
+        return 'Manual';
       case 'history':
-        return '历史记录';
+        return 'History';
       default:
-        return '未知';
+        return 'Unknown';
     }
   };
 
@@ -111,14 +111,14 @@ export function ReportsTab({ plantId }: { plantId: number }) {
       <div className="lg:col-span-1">
         <div className="bg-white rounded-xl border border-gray-200">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-gray-900 mb-4">报告列表</h2>
+            <h2 className="text-gray-900 mb-4">Reports</h2>
             <button
               onClick={handleGenerateReport}
               disabled={isGenerating}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white rounded-lg transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
-              <span>{isGenerating ? '生成中...' : '生成最新报告'}</span>
+              <span>{isGenerating ? 'Generating...' : 'Generate latest report'}</span>
             </button>
           </div>
 
@@ -134,7 +134,7 @@ export function ReportsTab({ plantId }: { plantId: number }) {
                 <div className="flex items-start gap-3">
                   <FileText className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900 mb-1 line-clamp-2">{report.summary || '报告'}</p>
+                    <p className="text-sm text-gray-900 mb-1 line-clamp-2">{report.summary || 'Report'}</p>
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${getTriggerBadgeColor(report.trigger)}`}>
                         {getTriggerText(report.trigger)}
@@ -145,7 +145,7 @@ export function ReportsTab({ plantId }: { plantId: number }) {
                 </div>
               </div>
             ))}
-            {!reportList.length && <div className="p-4 text-sm text-gray-500">暂无报告，生成一个试试</div>}
+            {!reportList.length && <div className="p-4 text-sm text-gray-500">No reports yet—generate one</div>}
           </div>
         </div>
       </div>
@@ -154,9 +154,9 @@ export function ReportsTab({ plantId }: { plantId: number }) {
         <div className="bg-white rounded-xl border border-gray-200">
           <div className="p-6 border-b border-gray-200 flex items-center justify-between">
             <div>
-              <h2 className="text-gray-900 mb-1">报告详情</h2>
+              <h2 className="text-gray-900 mb-1">Report details</h2>
               <p className="text-sm text-gray-500">
-                {selectedReport ? new Date(selectedReport.timestamp).toLocaleString() : '暂无报告'}
+                {selectedReport ? new Date(selectedReport.timestamp).toLocaleString() : 'No report'}
               </p>
             </div>
             <button
@@ -167,12 +167,12 @@ export function ReportsTab({ plantId }: { plantId: number }) {
               {copied ? (
                 <>
                   <Check className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-green-600">已复制</span>
+                  <span className="text-sm text-green-600">Copied</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-4 h-4" />
-                  <span className="text-sm">复制内容</span>
+                  <span className="text-sm">Copy content</span>
                 </>
               )}
             </button>
@@ -182,43 +182,45 @@ export function ReportsTab({ plantId }: { plantId: number }) {
             {selectedReport ? (
               <div className="prose max-w-none">
                 <div className="mb-6">
-                  <h3 className="text-gray-900 mb-2">今日生长情况概览</h3>
+                  <h3 className="text-gray-900 mb-2">Today overview</h3>
                   <p className="text-gray-700 leading-relaxed">
-                    {selectedReport.summary || selectedReport.content || '暂无内容'}
+                    {selectedReport.summary || selectedReport.content || 'No content'}
                   </p>
                 </div>
 
                 <div className="mb-6">
-                  <h3 className="text-gray-900 mb-2">环境状态评价</h3>
+                  <h3 className="text-gray-900 mb-2">Environment</h3>
                   <p className="text-gray-700 leading-relaxed">
-                    {selectedReport.environment || '暂无环境描述'}
+                    {selectedReport.environment || 'No environment description'}
                   </p>
                 </div>
 
                 <div className="mb-6">
-                  <h3 className="text-gray-900 mb-2">建议</h3>
+                  <h3 className="text-gray-900 mb-2">Suggestions</h3>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <ul className="text-gray-700 space-y-2 list-disc list-inside">
                       {(Array.isArray(selectedReport.suggestions)
                         ? selectedReport.suggestions
                         : (selectedReport.suggestions || '').split('\n')
-                      ).filter(Boolean).map((s, i) => (
-                        <li key={i}>{s}</li>
-                      ))}
-                      {!selectedReport.suggestions && <li>暂无建议</li>}
+                      )
+                        .filter(Boolean)
+                        .map((s, i) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      {!selectedReport.suggestions && <li>No suggestions</li>}
                     </ul>
                   </div>
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-2">完整分析内容：</p>
+                  <p className="text-xs text-gray-500 mb-2">Full analysis:</p>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {selectedReport.content || '暂无内容'}
+                    {selectedReport.content || 'No content'}
                   </p>
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-500">暂无报告</p>
+              <p className="text-sm text-gray-500">No report</p>
             )}
           </div>
         </div>
