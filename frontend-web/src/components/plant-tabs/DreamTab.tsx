@@ -82,9 +82,18 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
                 className="cursor-pointer group"
               >
                 <div className="aspect-square bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 rounded-lg mb-3 overflow-hidden">
-                  <div className="w-full h-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Sparkles className="w-12 h-12 text-purple-400" />
-                  </div>
+                  {dream.file_path ? (
+                    <img
+                      src={dream.file_path}
+                      alt="dream"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Sparkles className="w-12 h-12 text-purple-400" />
+                    </div>
+                  )}
                 </div>
                 <p className="text-sm text-gray-900 mb-1">{new Date(dream.created_at).toLocaleString()}</p>
                 <p className="text-xs text-gray-500 line-clamp-2">{dream.description || '暂无描述'}</p>
@@ -111,8 +120,16 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
             </div>
 
             <div className="p-6">
-              <div className="aspect-video bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 rounded-lg mb-6 flex items-center justify-center">
-                <Sparkles className="w-32 h-32 text-purple-400" />
+              <div className="aspect-video bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 rounded-lg mb-6 overflow-hidden flex items-center justify-center">
+                {selectedDream.file_path ? (
+                  <img
+                    src={selectedDream.file_path}
+                    alt="dream"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Sparkles className="w-32 h-32 text-purple-400" />
+                )}
               </div>
 
               <div className="mb-6">
