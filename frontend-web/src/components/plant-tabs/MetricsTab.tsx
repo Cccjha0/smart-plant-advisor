@@ -77,6 +77,12 @@ export function MetricsTab({ plantId }: { plantId: number }) {
     return `${v}`;
   };
 
+  const formatUnit = (u?: string | null) => {
+    if (!u) return '';
+    // Strip stray encoding artifacts and replace degree symbol with ASCII-friendly label
+    return u.replace('Â', '').replace('°C', 'degC').replace('°', 'deg');
+  };
+
   const toggleLine = (key: keyof typeof visibleLines) => {
     setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -315,7 +321,9 @@ export function MetricsTab({ plantId }: { plantId: number }) {
                         {rec.time_label || new Date(rec.timestamp).toLocaleString()}
                       </td>
                       <td className="py-2 px-2 text-gray-900 w-1/3">{formatValue(rec.value)}</td>
-                      <td className="py-2 px-2 text-gray-500 w-1/3">{rawData.unit || defaultUnit[rawSensor] || ''}</td>
+                      <td className="py-2 px-2 text-gray-500 w-1/3">
+                        {formatUnit(rawData.unit || defaultUnit[rawSensor] || '')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
