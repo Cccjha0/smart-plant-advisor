@@ -65,7 +65,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
   }, [plantId, rawSensor]);
 
   const defaultUnit: Record<typeof rawSensor, string> = {
-    temperature: 'degC',
+    temperature: 'C',
     soil_moisture: '%',
     light: 'lux',
     weight: 'g',
@@ -79,8 +79,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
 
   const formatUnit = (u?: string | null) => {
     if (!u) return '';
-    // Strip stray encoding artifacts and replace degree symbol with ASCII-friendly label
-    return u.replace('Â', '').replace('°C', 'degC').replace('°', 'deg');
+    return u.replace('Â', '').replace('°C', 'C').replace('°', 'C');
   };
 
   const toggleLine = (key: keyof typeof visibleLines) => {
