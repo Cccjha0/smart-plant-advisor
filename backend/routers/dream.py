@@ -49,7 +49,7 @@ def _build_environment(db: Session, dream: DreamImageRecord) -> dict:
     return {
         "temperature": temp,
         "light": light,
-        "moisture": soil_pct,
+        "moisture": round(soil_pct, 2) if soil_pct is not None else None,
         "moisture_raw": soil_raw,
         "weight": weight,
     }
