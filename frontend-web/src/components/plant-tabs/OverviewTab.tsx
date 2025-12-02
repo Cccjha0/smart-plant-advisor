@@ -64,26 +64,26 @@ export function OverviewTab({ plant }: { plant: Plant }) {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'healthy':
-        return '健康';
+        return 'Healthy';
       case 'slightly_stressed':
-        return '轻微压力';
+        return 'Mild stress';
       case 'stressed':
-        return '严重压力';
+        return 'Severe stress';
       default:
-        return '数据不足';
+        return 'Not enough data';
     }
   };
 
   const getStatusMessage = (status: string) => {
     switch (status) {
       case 'healthy':
-        return '植物生长状态良好，各项指标正常。继续保持当前的养护节奏。';
+        return 'Plant growth looks good. All indicators are normal. Keep the current routine.';
       case 'slightly_stressed':
-        return '植物处于轻微压力状态，建议检查土壤湿度和光照条件，适当调整浇水频率。';
+        return 'Plant is under mild stress. Check soil moisture and light, and adjust watering frequency as needed.';
       case 'stressed':
-        return '植物处于较大压力，需要立即检查根系健康、土壤状态和环境因素。';
+        return 'Plant is under high stress. Inspect roots, soil condition, and environment immediately.';
       default:
-        return '近期数据不足，无法做出准确评估。请确保传感器正常工作。';
+        return 'Recent data is insufficient to assess. Ensure sensors are working.';
     }
   };
 
@@ -106,56 +106,58 @@ export function OverviewTab({ plant }: { plant: Plant }) {
 
   const status = mapGrowthStatus(analysis?.growth_status);
 
+  if (loading) {
+    return <div className="text-gray-500">Loading...</div>;
+  }
+
   return (
     <div className="space-y-6">
       {/* Plant Info Card */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-gray-900 mb-4">植物信息</h2>
+        <h2 className="text-gray-900 mb-4">Plant Info</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div>
-            <p className="text-sm text-gray-500 mb-1">植物昵称</p>
-            <p className="text-gray-900">{plant.nickname || '未命名'}</p>
+            <p className="text-sm text-gray-500 mb-1">Nickname</p>
+            <p className="text-gray-900">{plant.nickname || 'Unnamed'}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">植物种类</p>
-            <p className="text-gray-900">{plant.species || '未填写种类'}</p>
+            <p className="text-sm text-gray-500 mb-1">Species</p>
+            <p className="text-gray-900">{plant.species || 'Species not set'}</p>
           </div>
           <div>
-              <p className="text-sm text-gray-500 mb-1">创建时间</p>
-              <p className="text-gray-900">
-                {plant.created_at ? new Date(plant.created_at).toLocaleString() : '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 mb-1">最近浇水</p>
-              <p className="text-gray-900">
-                {plant.last_watered_at ? new Date(plant.last_watered_at).toLocaleString() : '—'}
-              </p>
-            </div>
+            <p className="text-sm text-gray-500 mb-1">Created at</p>
+            <p className="text-gray-900">
+              {plant.created_at ? new Date(plant.created_at).toLocaleString() : '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Last watering</p>
+            <p className="text-gray-900">
+              {plant.last_watered_at ? new Date(plant.last_watered_at).toLocaleString() : '—'}
+            </p>
           </div>
         </div>
+      </div>
 
       {/* Status & Suggestions */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-gray-900 mb-4">当前状态 & 建议</h2>
-        
+        <h2 className="text-gray-900 mb-4">Current status & tips</h2>
+
         <div className="flex items-start gap-4 mb-4">
           <AlertCircle className="w-6 h-6 text-gray-400 flex-shrink-0 mt-1" />
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-gray-700">状态评估：</span>
+              <span className="text-gray-700">Status:</span>
               <span className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(status)}`}>
                 {getStatusText(status)}
               </span>
             </div>
-            <p className="text-gray-600 leading-relaxed">
-              {getStatusMessage(status)}
-            </p>
+            <p className="text-gray-600 leading-relaxed">{getStatusMessage(status)}</p>
           </div>
         </div>
 
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-900 mb-2">💡 今日建议</p>
+          <p className="text-sm text-blue-900 mb-2">💡 Today’s suggestion</p>
           {latestSuggestions.length ? (
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
               {latestSuggestions.map((s, idx) => (
@@ -163,21 +165,21 @@ export function OverviewTab({ plant }: { plant: Plant }) {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-blue-800">暂无最新建议，等待新的分析结果。</p>
+            <p className="text-sm text-blue-800">No latest suggestion yet; waiting for new analysis.</p>
           )}
         </div>
       </div>
 
       {/* 7-Day Metrics */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-gray-900 mb-6">近 7 天关键指标</h2>
-        
+        <h2 className="text-gray-900 mb-6">Key metrics (7 days)</h2>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Weight Trend */}
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Weight className="w-5 h-5 text-gray-600" />
-              <h3 className="text-gray-900">重量趋势</h3>
+              <h3 className="text-gray-900">Weight trend</h3>
             </div>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={lineDataWeight}>
@@ -194,7 +196,7 @@ export function OverviewTab({ plant }: { plant: Plant }) {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Droplets className="w-5 h-5 text-blue-600" />
-              <h3 className="text-gray-900">土壤湿度</h3>
+              <h3 className="text-gray-900">Soil moisture</h3>
             </div>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={lineDataMoisture}>
@@ -211,7 +213,7 @@ export function OverviewTab({ plant }: { plant: Plant }) {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Thermometer className="w-5 h-5 text-red-600" />
-              <h3 className="text-gray-900">温度变化</h3>
+              <h3 className="text-gray-900">Temperature</h3>
             </div>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={lineDataTemp}>
@@ -228,7 +230,7 @@ export function OverviewTab({ plant }: { plant: Plant }) {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Sun className="w-5 h-5 text-yellow-600" />
-              <h3 className="text-gray-900">光照强度</h3>
+              <h3 className="text-gray-900">Light intensity</h3>
             </div>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={lineDataLight}>

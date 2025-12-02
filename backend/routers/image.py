@@ -7,12 +7,9 @@ from sqlalchemy.orm import Session
 from config import SUPABASE_PLANT_BUCKET
 from database import get_db
 from models import ImageRecord
-from services.llm_service import LLMService
 from services.storage import upload_bytes
 
 router = APIRouter()
-
-llm_service = LLMService()
 
 
 @router.post("/upload_image")
@@ -36,8 +33,6 @@ async def upload_image(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"upload failed: {exc}") from exc
 
-    cv_result = llm_service.analyze_image(public_url)
-
     record = ImageRecord(
         plant_id=plant_id,
         file_path=public_url,
@@ -53,5 +48,4 @@ async def upload_image(
         "plant_id": plant_id,
         "image_id": record.id,
         "file_path": public_url,
-        "vision_result": cv_result,
     }
