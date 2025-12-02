@@ -120,6 +120,30 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
                 <p className="text-gray-900">{new Date(selectedDream.created_at).toLocaleString()}</p>
               </div>
 
+              {selectedDream.environment && (
+                <div className="mb-6">
+                  <p className="text-sm text-gray-500 mb-2">生成时环境参数</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500">温度</p>
+                      <p className="text-lg text-gray-900">{selectedDream.environment.temperature ?? '—'}°C</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500">湿度</p>
+                      <p className="text-lg text-gray-900">{selectedDream.environment.moisture ?? '—'}%</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500">光照</p>
+                      <p className="text-lg text-gray-900">{selectedDream.environment.light ?? '—'} lux</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500">体重</p>
+                      <p className="text-lg text-gray-900">{selectedDream.environment.weight ?? '—'} g</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                 <h3 className="text-gray-900 mb-2">梦境描述</h3>
                 <p className="text-gray-700 leading-relaxed">{selectedDream.description || '暂无描述'}</p>

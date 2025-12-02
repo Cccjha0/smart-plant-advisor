@@ -21,12 +21,44 @@ class DreamCreate(BaseModel):
     plant_id: int
 
 
+def _build_environment(db: Session, dream: DreamImageRecord) -> dict:
+    """
+    Build environment info from linked sensor/weight records.
+    """
+    temp = light = soil = weight = None
+    if dream.sensor_record_id:
+        sensor = (
+            db.query(SensorRecord)
+            .filter(SensorRecord.id == dream.sensor_record_id)
+            .first()
+        )
+        if sensor:
+            temp = sensor.temperature
+            light = sensor.light
+            soil = sensor.soil_moisture
+    if dream.weight_record_id:
+        w = (
+            db.query(WeightRecord)
+            .filter(WeightRecord.id == dream.weight_record_id)
+            .first()
+        )
+        if w:
+            weight = w.weight
+    return {
+        "temperature": temp,
+        "light": light,
+        "moisture": soil,
+        "weight": weight,
+    }
+
+
 class DreamOut(BaseModel):
     id: int
     plant_id: int
     file_path: str
     description: Optional[str]
     created_at: datetime
+    environment: Optional[dict]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -140,7 +172,14 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(record)
 
-    return record
+    return {
+        "id": record.id,
+        "plant_id": record.plant_id,
+        "file_path": record.file_path,
+        "description": record.description,
+        "created_at": record.created_at,
+        "environment": _build_environment(db, record),
+    }
 
 
 @router.get("/dreams/{plant_id}", response_model=list[DreamOut])
@@ -151,4 +190,14 @@ def list_dream_images(plant_id: int, db: Session = Depends(get_db)):
         .order_by(DreamImageRecord.created_at.desc())
         .all()
     )
-    return records
+    return [
+        {
+            "id": r.id,
+            "plant_id": r.plant_id,
+            "file_path": r.file_path,
+            "description": r.description,
+            "created_at": r.created_at,
+            "environment": _build_environment(db, r),
+        }
+        for r in records
+    ]
