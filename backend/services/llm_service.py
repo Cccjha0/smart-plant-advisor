@@ -117,6 +117,15 @@ class LLMService:
                     output = result.get("output")
                     msg = result.get("msg")
                     describe = result.get("describe") or result.get("description")
+                    # If output missing but msg contains JSON string with output/describe
+                    if not output and isinstance(msg, str) and msg.strip().startswith("{"):
+                        import json
+                        try:
+                            parsed_msg = json.loads(msg)
+                            output = output or parsed_msg.get("output")
+                            describe = describe or parsed_msg.get("describe") or parsed_msg.get("description")
+                        except Exception:
+                            pass
                     if isinstance(output, str):
                         # URL case
                         if output.startswith("http"):
