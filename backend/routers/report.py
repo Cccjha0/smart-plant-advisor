@@ -3,7 +3,7 @@ from typing import Optional
 import json
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -263,24 +263,6 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
         full_analysis=full_analysis,
         created_at=datetime.utcnow(),
     )
-
-    db.add(result)
-    db.flush()
-
-    # Update plant species if empty and plant_type is provided
-    if plant and plant_type and (plant.species is None or plant.species == ""):
-        plant.species = plant_type
-
-    # Write alert if provided
-    if alert_msg:
-        db.add(
-            Alert(
-                plant_id=plant_id,
-                analysis_result_id=result.id,
-                message=alert_msg,
-                created_at=datetime.utcnow(),
-            )
-        )
 
     db.add(result)
     db.flush()
