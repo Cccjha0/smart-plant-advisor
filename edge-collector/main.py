@@ -145,6 +145,20 @@ def upload_current_sensor_data(plant_id: int):
         log("[浇水后] ThingsBoard 也收到实时数据")
     except Exception as e:
         log(f"[浇水后] ThingsBoard 上传失败: {e}")
+    
+    delay_seconds = 5   # 你可以改成 8~20 秒之间，我实测 12 秒最稳
+    log(f"浇水后等待 {delay_seconds} 秒，让传感器彻底稳定……")
+    time.sleep(delay_seconds)
+
+    # 3. 调用 watering-trigger 接口（触发后端重新生成建议）
+    try:
+        r = requests.post(f"{BASE_URL}/watering-trigger/{plant_id}", timeout=15)
+        if r.status_code in (200, 201):
+            log(f"成功触发 watering-trigger/{plant_id} → 后端开始重新生成浇水建议")
+        else:
+            log(f"watering-trigger 返回 {r.status_code}: {r.text}")
+    except Exception as e:
+        log(f"调用 watering-trigger/{plant_id} 失败: {e}")
 # ==================== 独立线程：每20秒实时检测一次浇水 ====================
 def watering_detection_thread(plant_id: int):
     global last_known_soil_raw, watering_triggered
