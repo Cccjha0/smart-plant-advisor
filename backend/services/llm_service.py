@@ -93,8 +93,50 @@ class LLMService:
         }
 
     def generate_dream_image(self, plant_id: int, sensor_payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Mock dream garden image generation based on sensor snapshot."""
-        # 1x1 transparent PNG bytes
+        """
+        Dream image generation (CN workflow when available), fallback to mock PNG.
+        Returns: {"data": bytes|None, "ext": str, "url": str|None, "describe": str|None, "msg": str|None}
+        """
+        # Prefer CN workflow if configured
+        if self.workflow and hasattr(self.workflow, "generate_dream_image_cn"):
+            try:
+                payload = {
+                    "plant_id": str(plant_id),
+                    "temperature": str(sensor_payload.get("temperature", "")),
+                    "light": str(sensor_payload.get("light", "")),
+                    "soil_moisture": str(sensor_payload.get("soil_moisture", "")),
+                    "health_status": str(
+                        sensor_payload.get("health_status")
+                        or sensor_payload.get("full_analysis")
+                        or sensor_payload.get("growth_status", "")
+                    ),
+                }
+                self.logger.info("LLMService.generate_dream_image: sending payload to Coze CN", extra={"coze_payload": payload})
+                result = self.workflow.generate_dream_image_cn(payload)
+                if result:
+                    output = result.get("output")
+                    msg = result.get("msg")
+                    describe = result.get("describe") or result.get("description")
+                    if isinstance(output, str):
+                        # URL case
+                        if output.startswith("http"):
+                            return {"data": None, "ext": "url", "url": output, "describe": describe, "msg": msg}
+                        # base64 string case
+                        import base64
+                        try:
+                            data_bytes = base64.b64decode(output)
+                            return {"data": data_bytes, "ext": "png", "url": None, "describe": describe, "msg": msg}
+                        except Exception:
+                            pass
+                    elif isinstance(output, bytes):
+                        return {"data": output, "ext": "png", "url": None, "describe": describe, "msg": msg}
+                    # if output unusable, fall through to mock
+                    self.logger.warning("LLMService.generate_dream_image: CN workflow returned unusable output, using mock. msg=%s", msg)
+            except Exception as e:
+                self.logger.warning("LLMService.generate_dream_image: CN workflow failed, fallback to mock. err=%s", e)
+
+        # Mock fallback
+        self.logger.info("LLMService.generate_dream_image: using mock fallback.")
         png_bytes = (
             b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
             b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0bIDAT\x08\xd7c```"
@@ -103,4 +145,7 @@ class LLMService:
         return {
             "data": png_bytes,
             "ext": "png",
+            "url": None,
+            "describe": None,
+            "msg": "mock",
         }
