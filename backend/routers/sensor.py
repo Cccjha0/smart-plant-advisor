@@ -37,14 +37,6 @@ def create_sensor_record(payload: SensorCreate, db: Session = Depends(get_db)):
 
     ts = payload.timestamp or datetime.utcnow()
 
-    # previous soil moisture for watering detection
-    prev_soil_row = (
-        db.query(SensorRecord.soil_moisture, SensorRecord.timestamp)
-        .filter(SensorRecord.plant_id == payload.plant_id, SensorRecord.soil_moisture.isnot(None))
-        .order_by(SensorRecord.timestamp.desc())
-        .first()
-    )
-
     record = SensorRecord(
         plant_id=payload.plant_id,
         temperature=payload.temperature,
@@ -54,20 +46,6 @@ def create_sensor_record(payload: SensorCreate, db: Session = Depends(get_db)):
     )
 
     db.add(record)
-    db.flush()
-
-    # Simple watering detection: soil moisture raw drops significantly (0=wet, 255=dry)
-    # If current soil_moisture is provided and previous exists, detect large negative delta
-    WATER_SOIL_DELTA = -20.0  # raw drop threshold (>=20 point wetter)
-    watered = False
-    if payload.soil_moisture is not None and prev_soil_row:
-        prev_val, prev_ts = prev_soil_row
-        if prev_val is not None:
-            delta = payload.soil_moisture - prev_val
-            if delta <= WATER_SOIL_DELTA:
-                plant.last_watered_at = ts
-                watered = True
-
     db.commit()
     db.refresh(record)
 
@@ -75,7 +53,7 @@ def create_sensor_record(payload: SensorCreate, db: Session = Depends(get_db)):
         "status": "ok",
         "record_id": record.id,
         "timestamp": record.timestamp,
-        "watering_detected": watered,
+        "watering_detected": False,
     }
 
 
@@ -87,13 +65,6 @@ def create_weight_record(payload: WeightCreate, db: Session = Depends(get_db)):
 
     ts = payload.timestamp or datetime.utcnow()
 
-    prev_weight_row = (
-        db.query(WeightRecord.weight, WeightRecord.timestamp)
-        .filter(WeightRecord.plant_id == payload.plant_id, WeightRecord.weight.isnot(None))
-        .order_by(WeightRecord.timestamp.desc())
-        .first()
-    )
-
     record = WeightRecord(
         plant_id=payload.plant_id,
         weight=payload.weight,
@@ -101,23 +72,10 @@ def create_weight_record(payload: WeightCreate, db: Session = Depends(get_db)):
     )
 
     db.add(record)
-    db.flush()
-
-    # Watering detection via weight jump
-    WATER_WEIGHT_DELTA = 30.0  # grams
-    watered = False
-    if prev_weight_row:
-        prev_w, _prev_ts = prev_weight_row
-        if prev_w is not None:
-            delta_w = payload.weight - prev_w
-            if delta_w >= WATER_WEIGHT_DELTA:
-                plant.last_watered_at = ts
-                watered = True
-
     db.commit()
     db.refresh(record)
 
-    return {"status": "ok", "id": record.id, "timestamp": record.timestamp, "watering_detected": watered}
+    return {"status": "ok", "id": record.id, "timestamp": record.timestamp, "watering_detected": False}
 
 
 def _soil_to_pct(raw: float | None) -> float | None:

@@ -45,11 +45,6 @@ JOB_METADATA = {
         "description": "每周清理30天前的旧传感器数据",
         "cron_expr": "0 2 * * 0",
     },
-    "post_watering": {
-        "name": "浇水后一次性任务",
-        "description": "浇水后 1 小时运行一次完整管线",
-        "cron_expr": None,
-    },
 }
 
 
@@ -407,51 +402,6 @@ def run_weekly_data_cleanup(retention_days: int = 30):
         _log_job_run("weekly_data_cleanup", "failed", f"Error: {exc}", started_at, datetime.utcnow())
     finally:
         db.close()
-
-
-def run_post_watering_job(plant_id: int):
-    started_at = datetime.utcnow()
-    db = SessionLocal()
-    try:
-        plant = db.query(Plant).filter(Plant.id == plant_id).first()
-        if not plant:
-            _log_job_run("post_watering", "warning", f"Plant {plant_id} not found", started_at, datetime.utcnow())
-            return
-
-        if not _has_recent_data(db, plant_id, days=1):
-            _log_job_run("post_watering", "warning", f"No recent data for plant {plant_id}", started_at, datetime.utcnow())
-            return
-
-        _run_single_analysis_and_optionals(
-            plant=plant,
-            db=db,
-            include_llm=True,
-            include_dream=True,
-            trigger="watering",
-        )
-
-        db.commit()
-        _log_job_run("post_watering", "success", f"Post-watering pipeline for plant {plant_id}", started_at, datetime.utcnow())
-    except Exception as exc:
-        db.rollback()
-        _log_job_run("post_watering", "failed", f"Error: {exc}", started_at, datetime.utcnow())
-    finally:
-        db.close()
-
-
-def schedule_post_watering_job(plant_id: int, delay_minutes: int = 60):
-    run_date = datetime.utcnow() + timedelta(minutes=delay_minutes)
-    job_id = f"post_watering_{plant_id}_{int(run_date.timestamp())}"
-
-    scheduler.add_job(
-        run_post_watering_job,
-        "date",
-        run_date=run_date,
-        args=[plant_id],
-        id=job_id,
-        replace_existing=False,
-    )
-    _sync_jobs_table()
 
 
 def _sync_jobs_table():
