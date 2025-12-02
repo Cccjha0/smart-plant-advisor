@@ -188,6 +188,18 @@ def _run_single_analysis_and_optionals(
         ext = dream_result.get("ext", "png")
         description = dream_result.get("describe") or dream_result.get("description") or None
         url = dream_result.get("url")
+        latest_sensor_row = (
+            db.query(SensorRecord)
+            .filter(SensorRecord.plant_id == plant_id)
+            .order_by(SensorRecord.timestamp.desc())
+            .first()
+        )
+        latest_weight_row = (
+            db.query(WeightRecord)
+            .filter(WeightRecord.plant_id == plant_id, WeightRecord.weight.isnot(None))
+            .order_by(WeightRecord.timestamp.desc())
+            .first()
+        )
         file_path = None
         if dream_bytes:
             ts = int(datetime.utcnow().timestamp())
@@ -240,8 +252,8 @@ def _run_single_analysis_and_optionals(
             db.add(
                 DreamImageRecord(
                     plant_id=plant_id,
-                    sensor_record_id=None,
-                    weight_record_id=None,
+                    sensor_record_id=latest_sensor_row.id if latest_sensor_row else None,
+                    weight_record_id=latest_weight_row.id if latest_weight_row else None,
                     file_path=file_path,
                     description=description,
                     created_at=datetime.utcnow(),

@@ -37,44 +37,31 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
     if not plant:
         raise HTTPException(status_code=400, detail=f"Plant {payload.plant_id} does not exist.")
 
-    # Gather latest sensor/weight and analysis as defaults
-    def _latest_sensor(column):
-        row = (
-            db.query(column, SensorRecord.timestamp)
-            .filter(SensorRecord.plant_id == payload.plant_id, column.isnot(None))
-            .order_by(SensorRecord.timestamp.desc())
-            .first()
-        )
-        return (row[0], row[1]) if row else (None, None)
-
-    def _latest_weight():
-        row = (
-            db.query(WeightRecord.weight, WeightRecord.timestamp)
-            .filter(WeightRecord.plant_id == payload.plant_id, WeightRecord.weight.isnot(None))
-            .order_by(WeightRecord.timestamp.desc())
-            .first()
-        )
-        return (row[0], row[1]) if row else (None, None)
-
-    temp_val, _ = _latest_sensor(SensorRecord.temperature)
-    light_val, _ = _latest_sensor(SensorRecord.light)
-    soil_val, _ = _latest_sensor(SensorRecord.soil_moisture)
-    weight_val, _ = _latest_weight()
-
+    # Gather latest sensor/weight rows and analysis as defaults
+    latest_sensor_row = (
+        db.query(SensorRecord)
+        .filter(SensorRecord.plant_id == payload.plant_id)
+        .order_by(SensorRecord.timestamp.desc())
+        .first()
+    )
+    latest_weight_row = (
+        db.query(WeightRecord)
+        .filter(WeightRecord.plant_id == payload.plant_id, WeightRecord.weight.isnot(None))
+        .order_by(WeightRecord.timestamp.desc())
+        .first()
+    )
     latest_analysis = (
         db.query(AnalysisResult)
         .filter(AnalysisResult.plant_id == payload.plant_id)
         .order_by(AnalysisResult.created_at.desc())
         .first()
     )
-    health_status_val = latest_analysis.full_analysis if latest_analysis else None
-
     sensor_payload = {
-        "temperature": temp_val,
-        "light": light_val,
-        "soil_moisture": soil_val,
-        "weight": weight_val,
-        "health_status": health_status_val,
+        "temperature": latest_sensor_row.temperature if latest_sensor_row else None,
+        "light": latest_sensor_row.light if latest_sensor_row else None,
+        "soil_moisture": latest_sensor_row.soil_moisture if latest_sensor_row else None,
+        "weight": latest_weight_row.weight if latest_weight_row else None,
+        "health_status": latest_analysis.full_analysis if latest_analysis else None,
     }
 
     dream_result = llm_service.generate_dream_image(payload.plant_id, sensor_payload)
@@ -142,6 +129,8 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
 
     record = DreamImageRecord(
         plant_id=payload.plant_id,
+        sensor_record_id=latest_sensor_row.id if latest_sensor_row else None,
+        weight_record_id=latest_weight_row.id if latest_weight_row else None,
         file_path=file_path,
         description=description,
         created_at=datetime.utcnow(),
