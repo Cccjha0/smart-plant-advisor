@@ -11,6 +11,7 @@ from database import get_db
 from models import ImageRecord, SensorRecord, AnalysisResult, Plant, Alert, DreamImageRecord, WeightRecord
 from services.growth_service import GrowthService
 from services.llm_service import LLMService
+from services.scheduler import _run_single_analysis_and_optionals
 
 router = APIRouter()
 
@@ -199,14 +200,13 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
     growth_rate_val = growth_result.get("growth_rate_3d")
     growth_rate_str = "0" if growth_rate_val is None else str(growth_rate_val)
     plant_id_str = str(plant_id)
-    image_url_val = latest_image.file_path if latest_image else "https://example.com/placeholder.png"
+    image_url_val = latest_image.file_path if latest_image else None
 
     llm_input = {
         "growth_status": growth_status_val,
         "growth_rate_3d": growth_rate_str,
         "plant_id": plant_id_str,
         "nickname": plant.nickname if plant else "",
-        "image_url": image_url_val,
         "metrics_snapshot": metrics_snapshot,
         "sensor_data": sensor_data_payload,
         "stress_factors": growth_result.get("stress_factors") or {
@@ -216,6 +216,8 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
             "temperature_pressure": 0,
         },
     }
+    if image_url_val:
+        llm_input["image_url"] = image_url_val
     logger.info("[report] llm_input keys=%s", list(llm_input.keys()))
 
     llm_output = llm_service.generate(llm_input)
@@ -312,6 +314,29 @@ def generate_report(plant_id: int, db: Session = Depends(get_db)):
         },
         "analysis_result_id": result.id,
     }
+
+
+@router.post("/watering-trigger/{plant_id}")
+def trigger_watering_pipeline(plant_id: int, db: Session = Depends(get_db)):
+    """
+    Trigger LLM report + dream generation for a watering event.
+    """
+    plant = db.query(Plant).filter(Plant.id == plant_id).first()
+    if not plant:
+        raise HTTPException(status_code=404, detail="Plant not found")
+    try:
+        _run_single_analysis_and_optionals(
+            plant=plant,
+            db=db,
+            include_llm=True,
+            include_dream=True,
+            trigger="watering",
+        )
+        db.commit()
+        return {"status": "ok"}
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"watering trigger failed: {exc}")
 
 
 @router.get("/reports/{plant_id}")
