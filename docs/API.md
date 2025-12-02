@@ -44,7 +44,7 @@ Base URL: `http://<host>:8000`
 - Body: `{"plant_id": 1, "weight": 123.4, "timestamp": "2025-11-22T02:00:00Z"}`
 - 200: `{"status": "ok", "id": 5}`
 
-## Images (LLM vision)
+## Images
 ### POST /upload_image
 - Multipart form: `plant_id` (int), `image` (file)
 - Uploads to Supabase Storage (`plant-images` by default) and stores public URL.
@@ -54,15 +54,7 @@ Base URL: `http://<host>:8000`
   "status": "ok",
   "plant_id": 1,
   "image_id": 3,
-  "file_path": "https://<supabase>/storage/v1/object/public/plant-images/1/<filename>.jpg",
-  "vision_result": {
-    "plant_type": "unknown",
-    "growth_overview": "...",
-    "environment_assessment": "...",
-    "suggestions": "...",
-    "full_analysis": "...",
-    "alert": null
-  }
+  "file_path": "https://<supabase>/storage/v1/object/public/plant-images/1/<filename>.jpg"
 }
 ```
 
@@ -92,39 +84,46 @@ Base URL: `http://<host>:8000`
   "plant_id": 1,
   "analysis": { "...": "..." },
   "report": {
-    "plant_type": "Succulent",
     "growth_overview": "...",
     "environment_assessment": "...",
     "suggestions": "...",
     "full_analysis": "...",
-    "alert": null,
     "trigger": "manual"
   },
   "analysis_result_id": 7
 }
 ```
 
+### POST /watering-trigger/{plant_id}
+- Triggers LLM report + dream generation for a watering event (uses latest sensor/weight/image; sets `trigger="watering"`).
+- 200: `{"status": "ok"}`
+
+### GET /reports/{plant_id}
+- Query `limit` (default 20). Lists recent AnalysisResult rows.
+
 ## Dream Garden
 ### POST /dreams
-- Body:
-```json
-{ "plant_id": 1, "temperature": 23.5, "light": 120.0, "soil_moisture": 45.0, "health_status": "normal" }
-```
-- Generates dream image, uploads to Supabase Storage (`dream-images`), stores public URL.
-- Backend can call Coze CN workflow (`COZE_API_TOKEN_CN` / `COZE_WORKFLOW_ID_CN`); inputs are strings, `health_status` can reuse latest `analysis_results.full_analysis`.
+- Body: `{"plant_id": 1}`
+- Backend pulls latest sensor/weight rows and latest analysis for `health_status`, calls CN dream workflow, re-uploads Coze image to Supabase (`dream-images`), stores public URL and description.
 - 200:
 ```json
 {
   "id": 2,
   "plant_id": 1,
-  "file_path": "https://<supabase>/storage/v1/object/public/dream-images/1/<filename>.jpg",
-  "description": null,
-  "created_at": "2025-11-22T02:00:00Z"
+  "file_path": "https://<supabase>/storage/v1/object/public/dream-images/1/<timestamp>.png",
+  "description": "dream description or null",
+  "created_at": "2025-11-22T02:00:00Z",
+  "environment": {
+    "temperature": 23.5,
+    "light": 120.0,
+    "moisture": 55.1,
+    "weight": 470.3
+  }
 }
 ```
 
 ### GET /dreams/{plant_id}
-- Lists dream images for a plant.
+- Lists dream images for a plant (includes environment block and description).
 
 ## Metrics (soil moisture returned as %)
 ### GET /metrics/{plant_id}
@@ -185,6 +184,7 @@ Base URL: `http://<host>:8000`
 ### POST /scheduler/jobs/{id}/pause
 ### POST /scheduler/jobs/{id}/resume
 ### POST /scheduler/jobs/{id}/run-now
+- Manual runs are logged to `scheduler_job_runs`.
 ### GET /scheduler/logs
 - Optional `limit` (default 50). Each item:
 ```json

@@ -57,7 +57,17 @@ def run_cycle(plant_id: int):
     log(f"[avg 10m] temp={avg_temp} °C | light={avg_light} lux | soil={avg_soil} | weight={avg_weight} g")
     upload_sensor_and_weight(plant_id, avg_temp, avg_light, avg_soil, avg_weight)
 
-
+    # ===== 新增：同时发到 ThingsBoard（只加这三行！）=====
+    try:
+        from tb_client import upload_to_thingsboard
+        sensor_dict = {
+            "temperature": avg_temp,
+            "light": avg_light,
+            "soil_moisture": avg_soil,           # 原始值 0~255
+        }
+        upload_to_thingsboard(sensor_dict, weight=avg_weight)
+    except Exception as e:
+        log(f"[ThingsBoard] 调用失败（不影响主流程）: {e}")
 def main():
     log("Smart Plant Advisor edge collector (modular)")
     plant_id = PLANT_ID_DEFAULT
@@ -81,6 +91,12 @@ def main():
             photo_path = capture_photo()
             if photo_path:
                 upload_image_file(plant_id, photo_path)
+                # ===== 新增：把照片路径也同步到 ThingsBoard =====
+                # try:
+                    #from tb_client import upload_to_thingsboard
+                    # upload_to_thingsboard({}, photo_path=photo_path)  # 只传照片
+                # except Exception as e:
+                    # log(f"[ThingsBoard] 照片同步失败: {e}")
             else:
                 log("[photo] capture failed; will retry next hour")
             last_photo_time = current_time
