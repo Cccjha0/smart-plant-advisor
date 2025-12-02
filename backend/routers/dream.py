@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+import requests
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, ConfigDict
@@ -85,6 +86,18 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
     if not dream_bytes and not url:
         raise HTTPException(status_code=500, detail="dream image generation failed")
 
+    def _upload_bytes(bytes_data: bytes, ext_hint: str) -> str:
+        ts = int(datetime.utcnow().timestamp())
+        ext_clean = ext_hint.lstrip(".") or "png"
+        storage_path = f"{payload.plant_id}/{ts}.{ext_clean}"
+        public_url = upload_bytes(
+            SUPABASE_DREAM_BUCKET,
+            storage_path,
+            bytes_data,
+            f"image/{ext_clean}",
+        )
+        return public_url
+
     file_path = url
     if dream_bytes:
         ts = int(datetime.utcnow().timestamp())
@@ -101,6 +114,31 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
             file_path = public_url
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"upload failed: {exc}") from exc
+
+    elif url:
+        # Download Coze URL and re-upload to Supabase
+        try:
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            content = resp.content
+            if not content:
+                raise HTTPException(status_code=500, detail="empty image content from Coze URL")
+            # guess ext
+            ct = resp.headers.get("Content-Type", "")
+            ext_guess = "png"
+            if "jpeg" in ct:
+                ext_guess = "jpg"
+            elif "png" in ct:
+                ext_guess = "png"
+            elif "webp" in ct:
+                ext_guess = "webp"
+            elif "gif" in ct:
+                ext_guess = "gif"
+            file_path = _upload_bytes(content, ext_guess)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"download/upload failed: {exc}") from exc
 
     record = DreamImageRecord(
         plant_id=payload.plant_id,

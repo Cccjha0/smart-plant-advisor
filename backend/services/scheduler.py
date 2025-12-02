@@ -187,6 +187,8 @@ def _run_single_analysis_and_optionals(
         dream_bytes = dream_result.get("data")
         ext = dream_result.get("ext", "png")
         description = dream_result.get("describe") or dream_result.get("description") or None
+        url = dream_result.get("url")
+        file_path = None
         if dream_bytes:
             ts = int(datetime.utcnow().timestamp())
             ext_clean = ext.lstrip(".") or "png"
@@ -200,13 +202,47 @@ def _run_single_analysis_and_optionals(
                 )
             except Exception:
                 public_url = None
+            file_path = public_url or storage_path
+        elif url:
+            # download Coze URL and re-upload to Supabase
+            import requests
 
+            try:
+                resp = requests.get(url, timeout=10)
+                resp.raise_for_status()
+                content = resp.content
+                if not content:
+                    raise Exception("empty image content from Coze URL")
+                ct = resp.headers.get("Content-Type", "")
+                ext_guess = "png"
+                if "jpeg" in ct:
+                    ext_guess = "jpg"
+                elif "png" in ct:
+                    ext_guess = "png"
+                elif "webp" in ct:
+                    ext_guess = "webp"
+                elif "gif" in ct:
+                    ext_guess = "gif"
+                ts = int(datetime.utcnow().timestamp())
+                storage_path = f"{plant_id}/{ts}.{ext_guess}"
+                public_url = upload_bytes(
+                    SUPABASE_DREAM_BUCKET,
+                    storage_path,
+                    content,
+                    f"image/{ext_guess}",
+                )
+                file_path = public_url or storage_path
+            except Exception:
+                # as a last resort, store the Coze URL
+                file_path = url
+
+        if file_path:
             db.add(
                 DreamImageRecord(
                     plant_id=plant_id,
                     sensor_record_id=None,
                     weight_record_id=None,
-                    file_path=public_url or storage_path,
+                    file_path=file_path,
                     description=description,
                     created_at=datetime.utcnow(),
                 )
