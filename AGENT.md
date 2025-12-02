@@ -1,55 +1,57 @@
 # AGENT.md — Backend & Cloud Data Platform Agent
 
-## Local development instructions
-- Initialize backend locally before any cloud config.
-- Create `backend/` structure (`app.py`, `routers/`, `models/`, `services/`, `database.py`).
-- Use venv: `python -m venv venv && source venv/bin/activate` (or `venv\Scripts\activate` on Windows).
-- Install deps: `pip install -r backend/requirements.txt`.
-- Run: `uvicorn app:app --reload` from `backend/`.
-- Use SQLite locally; verify `/sensor`, `/weight`, `/upload_image`.
+## Local development
+- Python 3.10+ with venv.
+- Install: `pip install -r backend/requirements.txt`.
+- Env: copy `backend.env.example` → `backend/.env`; set `DB_URL`, `SUPABASE_URL`, `SUPABASE_KEY`, optional bucket names.
+- Run: `cd backend && uvicorn app:app --reload`.
+- CORS: enabled for `http://localhost:5173`.
 
-## Cloud database (Supabase)
-- Set `DB_URL` in `.env` (Supabase Postgres; `config.py` converts `postgres://`).
-- Tables created via `Base.metadata.create_all(bind=engine)`.
-- Store sensor, weight, image, analysis data in Supabase from day one.
+## Cloud (Supabase + Render)
+- `DB_URL` points to Supabase Postgres (`config.py` converts `postgres://`).
+- Tables auto-created via `Base.metadata.create_all(bind=engine)`.
+- Render command: `uvicorn app:app --host 0.0.0.0 --port $PORT`.
+- Edge devices should POST to the Render base URL when deployed.
 
-## Render deployment
-- Push to GitHub.
-- Render Web Service start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`.
-- Env: `DB_URL` (Supabase).
-- Update edge device to post to Render base URL.
+## Core API surface
+- Plants: `GET/POST /plants`, `GET /plants/by-nickname/{nickname}`, `GET /plants/by-status`.
+- Raw data: `GET /plants/{id}/raw-data`, `GET /plants/{id}/raw-data/export` (CSV).
+- Growth analytics: `GET /plants/{id}/growth-analytics`.
+- Ingest: `POST /sensor`, `POST /weight` (plant validation required).
+- Metrics (soil moisture in %): `GET /metrics/{id}`, `/metrics/{id}/daily-7d`, `/metrics/{id}/hourly-24h`.
+- Images: `POST /upload_image` (multipart file → Supabase Storage; stores public URL).
+- Analysis/Report: `GET /analysis/{id}`, `GET /report/{id}` (writes AnalysisResult text fields).
+- Dreams: `POST /dreams`, `GET /dreams/{plant_id}` (Supabase URLs).
+- Alerts: `GET/POST /alerts`, `DELETE /alerts/{id}` (supports `plant_id`, `analysis_result_id`).
+- Scheduler: `GET /scheduler/jobs`, `POST /scheduler/jobs/{id}/pause|resume|run-now`, `GET /scheduler/logs`.
+- System: `GET /admin/stats`, `GET /system/overview`, `GET /dashboard/system-overview`.
 
-## API usage
-- `/sensor`: temp, humidity, light, soil_moisture.
-- `/weight`: weight measurements.
-- `/upload_image`: multipart file upload; backend stores in Supabase Storage.
-- `/analysis/{plant_id}`: growth + sensor summary.
-- `/report/{plant_id}`: LLM report, stores AnalysisResult.
-- `/admin/stats`: verify counts/coverage.
+## Supabase Storage
+- Buckets: `plant-images` (original), `dream-images` (dream garden). Public URL persisted in DB.
+- Suggested object path: `{bucket}/{plant_id}/{timestamp}.jpg`.
 
-## External modules
-- `cv_service.py` -> `external_modules/cv/predictor.py` (if reintroduced; currently LLM stub + Supabase storage).
-- `growth_service.py` -> `external_modules/growth/analyzer.py`.
-- `llm_service.py` -> `external_modules/llm/generate_report.py`.
-- Wrappers return structured JSON; backend doesn’t implement models.
+## Scheduler (services/scheduler.py)
+- Daily analysis (recent data only).
+- Every 6h: split LLM report and dream image jobs; startup also triggers one full LLM+dream run.
+- Weekly cleanup of sensor/weight older than 30 days.
+- Post-watering one-off via `schedule_post_watering_job(plant_id, delay_minutes=60)`.
+- Jobs metadata in `scheduler_jobs`; run history in `scheduler_job_runs`; pause/resume/run-now via API.
 
-## Scheduler
-- APScheduler in `services/scheduler.py`.
-- Daily 02:00 analysis; every 6h analysis+LLM+dream (uploads to Supabase); startup triggers one full run.
-- `schedule_post_watering_job(plant_id, delay_minutes=60)` for one-off.
+## Data model deltas
+- `AnalysisResult`: `growth_status`, `growth_rate_3d`, `plant_type`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis`.
+- `DreamImage`: `file_path`, `description`, `created_at`.
+- `Alert`: `id`, `plant_id`, `analysis_result_id`, `message`, `created_at`.
+- Scheduler tables: `scheduler_jobs`, `scheduler_job_runs`.
 
-## One-week data requirement
-- Devices upload every 5–10 minutes.
-- Data goes to Supabase via API.
-- Check `/admin/stats` or SQL: record count ≥7 days; earliest timestamp ≥7 days ago.
-- No reliance on local storage for deliverables.
+## LLM inputs/outputs
+- Provide: `image_url`, `plant_id`, `nickname`, `sensor_data` (temp, light lux, soil_moisture %, weight), `growth_status`, `growth_rate_3d`, `stress_factors`, `metrics_snapshot` (from `/metrics/{plant_id}`).
+- Expect: `plant_type`, `growth_overview`, `environment_assessment`, `suggestions`, `full_analysis`, `alert`.
 
 ## Edge collector notes
 - Folder: `edge-collector/`.
-- Configure `BASE_URL`, optional `PLANT_NICKNAME` in `config.py`.
-- Sends sensor + weight to `/sensor`/`/weight`; uploads photo files (multipart) to `/upload_image` so backend writes to Supabase Storage.
+- Config: `BASE_URL`, optional `PLANT_NICKNAME` in `config.py`.
+- Sends `/sensor`, `/weight`; uploads photo files via multipart to `/upload_image` so backend writes to Supabase.
 
 ## PR / commit tips
-- Run lint/type checks when available.
-- Clear commit messages.
-- Never commit secrets; use env vars.
+- Keep secrets out of repo; use env vars.
+- Prefer small, focused commits; run tests/checks when available.

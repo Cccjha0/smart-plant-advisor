@@ -1,62 +1,75 @@
-# Smart Plant Advisor Backend API
+# Smart Plant Advisor Backend API (snapshot)
 
 Base URL: `http://<host>:8000`
 
-> `/upload_image` requires `python-multipart` installed in the backend environment.
+> `/upload_image` requires `python-multipart` installed.
 
 ## Plants
 ### POST /plants
-- Body (JSON): `{"nickname": string|null}`
-- 200 OK (JSON):
+- Body: `{"nickname": string|null}`
+- 200:
 ```json
 { "id": 1, "nickname": "Fern", "species": null }
 ```
 
 ### GET /plants
-- 200 OK (JSON):
-```json
-[
-  { "id": 1, "nickname": "Fern", "species": null }
-]
-```
+- List all plants.
 
-## Sensor & Weight
+### GET /plants/by-nickname/{nickname}
+- Returns plant by nickname if exists.
+
+### GET /plants/by-status
+- Query param: `status` (e.g., `normal`, `stressed`, `slow`, `stagnant`).
+- Returns plants whose latest AnalysisResult has the status.
+
+## Raw data
+### GET /plants/{id}/raw-data
+- Query: `sensor_type` (temperature|light|soil_moisture|weight), `page` (default 1), `page_size` (default 25)
+- Returns recent records (paged), including timestamp and value.
+
+### GET /plants/{id}/raw-data/export
+- Query: `sensor_type`, `date` or `start_time`/`end_time`
+- Response: `text/csv` with columns `time,sensor_type,value,unit`
+
+## Sensor & Weight ingest
 ### POST /sensor
-- Body (JSON): `{"plant_id": 1, "temperature": 23.5, "light": 120.0, "soil_moisture": 45.0, "timestamp": "2025-11-22T02:00:00Z"}`
-- Validates plant exists; inserts sensor record.
-- 200 OK (JSON):
+- Body:
 ```json
-{ "status": "ok", "record_id": 10, "timestamp": "2025-11-22T02:00:00Z" }
+{ "plant_id": 1, "temperature": 23.5, "light": 120.0, "soil_moisture": 45.0, "timestamp": "2025-11-22T02:00:00Z" }
 ```
-- 400 if plant not found.
+- Validates plant exists; inserts sensor record.
+- 200: `{"status": "ok", "record_id": 10, "timestamp": "2025-11-22T02:00:00Z"}`
 
 ### POST /weight
-- Body (JSON): `{"plant_id": 1, "weight": 123.4, "timestamp": "2025-11-22T02:00:00Z"}`
-- 200 OK (JSON):
-```json
-{ "status": "ok", "id": 5 }
-```
-- 400 if plant not found.
+- Body: `{"plant_id": 1, "weight": 123.4, "timestamp": "2025-11-22T02:00:00Z"}`
+- 200: `{"status": "ok", "id": 5}`
 
 ## Images (LLM vision)
 ### POST /upload_image
-- Form-data: `plant_id` (int), `image` (file)
-- Uploads the file to Supabase Storage (`plant-images` by default) and stores the public URL.
-- 200 OK (JSON):
+- Multipart form: `plant_id` (int), `image` (file)
+- Uploads to Supabase Storage (`plant-images` by default) and stores public URL.
+- 200:
 ```json
 {
   "status": "ok",
   "plant_id": 1,
   "image_id": 3,
-  "file_path": "https://<supabase>/storage/v1/object/public/plant-images/1/<filename>.png",
-  "vision_result": { "plant_type": "unknown", "leaf_health": "healthy", "symptoms": [] }
+  "file_path": "https://<supabase>/storage/v1/object/public/plant-images/1/<filename>.jpg",
+  "vision_result": {
+    "plant_type": "unknown",
+    "growth_overview": "...",
+    "environment_assessment": "...",
+    "suggestions": "...",
+    "full_analysis": "...",
+    "alert": null
+  }
 }
 ```
 
 ## Analysis & Reporting
 ### GET /analysis/{plant_id}
-- Aggregates last 7 days sensor averages; returns latest image info and mock growth analysis.
-- 200 OK (JSON):
+- Aggregates last 7 days sensor averages; returns latest image info and growth analysis.
+- 200:
 ```json
 {
   "plant_id": 1,
@@ -72,92 +85,134 @@ Base URL: `http://<host>:8000`
 ```
 
 ### GET /report/{plant_id}
-- Runs analysis, mock LLM report, stores `AnalysisResult`.
-- 200 OK (JSON):
+- Runs analysis, calls LLM, stores AnalysisResult with text fields.
+- 200:
 ```json
 {
   "plant_id": 1,
-  "analysis": { ...same fields as /analysis... },
-  "report": { "short": "Status: normal...", "long": "This is a mock weekly report..." },
+  "analysis": { "...": "..." },
+  "report": {
+    "plant_type": "Succulent",
+    "growth_overview": "...",
+    "environment_assessment": "...",
+    "suggestions": "...",
+    "full_analysis": "...",
+    "alert": null,
+    "trigger": "manual"
+  },
   "analysis_result_id": 7
 }
 ```
 
-## Dream Garden (LLM image generation)
+## Dream Garden
 ### POST /dreams
-- Body (JSON): `{"plant_id": 1, "temperature": 23.5, "light": 120.0, "soil_moisture": 45.0, "health_status": "normal"}`
-- Generates a mock dream image, uploads to Supabase Storage (`dream-images` by default), stores the public URL.
-- 200 OK (JSON):
+- Body:
+```json
+{ "plant_id": 1, "temperature": 23.5, "light": 120.0, "soil_moisture": 45.0, "health_status": "normal" }
+```
+- Generates dream image, uploads to Supabase Storage (`dream-images`), stores public URL.
+- Backend can call Coze CN workflow (`COZE_API_TOKEN_CN` / `COZE_WORKFLOW_ID_CN`); inputs are strings, `health_status` can reuse latest `analysis_results.full_analysis`.
+- 200:
 ```json
 {
   "id": 2,
   "plant_id": 1,
-  "file_path": "https://<supabase>/storage/v1/object/public/dream-images/1/<filename>.png",
-  "info": { "temperature": 23.5, "light": 120.0, "soil_moisture": 45.0, "health_status": "normal" },
+  "file_path": "https://<supabase>/storage/v1/object/public/dream-images/1/<filename>.jpg",
+  "description": null,
   "created_at": "2025-11-22T02:00:00Z"
 }
 ```
 
 ### GET /dreams/{plant_id}
-- 200 OK (JSON):
-```json
-[
-  {
-    "id": 2,
-    "plant_id": 1,
-    "file_path": "https://<supabase>/storage/v1/object/public/dream-images/1/<filename>.png",
-    "info": { "temperature": 23.5, "light": 120.0, "soil_moisture": 45.0, "health_status": "normal" },
-    "created_at": "2025-11-22T02:00:00Z"
-  }
-]
-```
+- Lists dream images for a plant.
 
-## Admin
-### GET /admin/stats
-- 200 OK (JSON):
-```json
-{
-  "total_plants": 1,
-  "total_sensor_records": 10,
-  "total_weight_records": 3,
-  "total_images": 4,
-  "total_analysis_results": 5,
-  "sensor_first_timestamp": "2025-11-21T00:00:00Z",
-  "sensor_last_timestamp": "2025-11-22T02:00:00Z"
-}
-```
-
+## Metrics (soil moisture returned as %)
 ### GET /metrics/{plant_id}
-- 200 OK (JSON):
+- Returns live metrics (now/averages/trends) for temp, soil, light, weight.
+
+### GET /plants/{plant_id}/latest-summary
+- Returns latest sensor snapshot and latest suggestions:
 ```json
 {
-  "temperature": {
-    "temp_now": 22.5,
-    "temp_6h_avg": 21.9,
-    "temp_24h_min": 20.1,
-    "temp_24h_max": 24.3
+  "plant_id": 1,
+  "sensors": {
+    "temperature": { "value": 23.5, "timestamp": "2025-11-22T02:00:00Z" },
+    "light": { "value": 120.0, "timestamp": "2025-11-22T02:00:00Z" },
+    "soil_moisture": { "value": 55.1, "timestamp": "2025-11-22T02:00:00Z" },
+    "weight": { "value": 470.3, "timestamp": "2025-11-22T02:00:00Z" }
   },
-  "soil_moisture": {
-    "soil_now": 120,
-    "soil_24h_min": 90,
-    "soil_24h_max": 180,
-    "soil_24h_trend": 15
-  },
-  "light": {
-    "light_now": 300,
-    "light_1h_avg": 250,
-    "light_today_sum": 35.5
-  },
-  "weight": {
-    "weight_now": 123.4,
-    "weight_24h_diff": -1.2,
-    "water_loss_per_hour": -0.05,
-    "hours_since_last_watering": 6.5,
-    "weight_drop_since_last_watering": -1.0
-  }
+  "suggestions": "text or null"
 }
+```
+
+### GET /metrics/{plant_id}/daily-7d
+- Returns daily aggregates for the last 7 days (temperature, soil_moisture %, light, weight).
+
+### GET /metrics/{plant_id}/hourly-24h
+- Returns hourly aggregates for the last 24 hours (temperature, soil_moisture %, light, weight).
+
+## Growth Analytics
+### GET /plants/{plant_id}/growth-analytics
+- Query: `days` (default 7)
+- Returns daily reference weight (algorithm), actual weight averages, growth_rate_3d series, stress scores.
+```json
+{
+  "plant_id": 1,
+  "days": 7,
+  "daily_weight": [
+    { "date": "2025-11-22", "actual_weight": 468.5, "reference_weight": 470.0 }
+  ],
+  "growth_rate_3d": [
+    { "date": "2025-11-22", "growth_rate_pct": 2.0 }
+  ],
+  "stress_scores": { "temperature": 1.2, "humidity": 3.5, "light": 2.1, "growth": 0.8 }
+}
+```
+
+## Alerts
+### GET /alerts?limit=20
+- Query params: `limit` (default 20), optional `plant_id`, `analysis_result_id`.
+- Returns recent alerts (message + created_at).
+
+### POST /alerts
+- Body: `{"message": "string", "plant_id": int|null, "analysis_result_id": int|null}`
+
+### DELETE /alerts/{id}
+
+## Scheduler
+### GET /scheduler/jobs
+- Returns registered jobs with status and next run.
+### POST /scheduler/jobs/{id}/pause
+### POST /scheduler/jobs/{id}/resume
+### POST /scheduler/jobs/{id}/run-now
+### GET /scheduler/logs
+- Optional `limit` (default 50). Each item:
+```json
+{
+  "id": 1,
+  "jobKey": "daily_analysis",
+  "jobName": "每日植物分析",
+  "status": "success",
+  "message": "Daily analysis completed",
+  "startedAt": "2024-11-28T08:00:00Z",
+  "finishedAt": "2024-11-28T08:02:15Z",
+  "durationSeconds": 135
+}
+```
+
+## System / Admin
+### GET /admin/stats
+- Counts: plants, sensor_records, weight_records, images, analysis_results, timestamps of first/last sensor data.
+
+### GET /system/overview
+- Counts across plants/images/sensor/analysis/dreams.
+
+### GET /dashboard/system-overview
+- Summary for dashboard (abnormal_plants = latest analysis per plant with growth_status == 'stressed'):
+```json
+{ "total_plants": 4, "active_last_24h": 3, "abnormal_plants": 1, "dreams_generated_today": 8 }
 ```
 
 ## Health
 ### GET /
-- 200 OK (JSON): `{ "status": "backend ok", "db": "connected" }`
+- `{"status": "backend ok", "db": "connected"}`

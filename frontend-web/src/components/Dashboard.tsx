@@ -1,19 +1,96 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Leaf, Activity, AlertTriangle, Image, Search, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react';
-import { mockPlants, mockStats, mockAlerts, mockRecentDreams } from '../utils/mockData';
+import { api, AlertDto, DashboardOverview, Plant, DreamDto, AnalysisDto, MetricsDto } from '../utils/api';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [plants, setPlants] = useState<Plant[]>([]);
+  const [analysisMap, setAnalysisMap] = useState<Record<number, AnalysisDto | null>>({});
+  const [metricsMap, setMetricsMap] = useState<Record<number, MetricsDto | null>>({});
+  const [dreamMap, setDreamMap] = useState<Record<number, DreamDto | null>>({});
+  const [stats, setStats] = useState<DashboardOverview | null>(null);
+  const [alerts, setAlerts] = useState<AlertDto[]>([]);
+  const [dreams, setDreams] = useState<(DreamDto & { nickname?: string | null })[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredPlants = mockPlants.filter((plant) => {
-    const matchesSearch = plant.nickname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         plant.species.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || plant.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [statsRes, plantsRes, alertsRes] = await Promise.all([
+          api.getDashboardOverview().catch(() => null),
+          api.getPlants().catch(() => []),
+          api.getAlerts(10).catch(() => []),
+        ]);
+        setStats(statsRes);
+        setPlants(plantsRes || []);
+        setAlerts(alertsRes || []);
+
+        const firstPlants = (plantsRes || []).slice(0, 4);
+        const dreamLists = await Promise.all(
+          firstPlants.map((p) =>
+            api.getDreamsByPlant(p.id)
+              .then((ds) => ds.map((d) => ({ ...d, nickname: p.nickname })))
+              .catch(() => []),
+          ),
+        );
+        const merged = dreamLists
+          .flat()
+          .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          .slice(0, 4);
+        setDreams(merged);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    const loadPerPlantData = async () => {
+      if (!plants.length) {
+        setAnalysisMap({});
+        setMetricsMap({});
+        setDreamMap({});
+        return;
+      }
+      const entries = await Promise.all(
+        plants.map(async (p) => {
+          const [analysis, metrics, dreams] = await Promise.all([
+            api.getAnalysis(p.id).catch(() => null),
+            api.getMetrics(p.id).catch(() => null),
+            api.getDreamsByPlant(p.id).catch(() => [] as DreamDto[]),
+          ]);
+          return {
+            id: p.id,
+            analysis,
+            metrics,
+            dream: dreams[0] ?? null,
+          };
+        }),
+      );
+
+      setAnalysisMap(Object.fromEntries(entries.map((e) => [e.id, e.analysis])));
+      setMetricsMap(Object.fromEntries(entries.map((e) => [e.id, e.metrics])));
+      setDreamMap(Object.fromEntries(entries.map((e) => [e.id, e.dream])));
+    };
+    loadPerPlantData();
+  }, [plants]);
+
+  const filteredPlants = useMemo(() => {
+    return plants.filter((plant) => {
+      const nickname = plant.nickname || '';
+      const species = plant.species || '';
+      const matchesSearch =
+        nickname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        species.toLowerCase().includes(searchTerm.toLowerCase());
+      const status = mapGrowthStatus(analysisMap[plant.id]?.growth_status);
+      const matchesFilter = filterStatus === 'all' || status === filterStatus;
+      return matchesSearch && matchesFilter;
+    });
+  }, [plants, searchTerm, filterStatus, analysisMap]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -47,12 +124,25 @@ export function Dashboard() {
     return <Minus className="w-4 h-4 text-gray-600" />;
   };
 
+  const timeAgo = (iso?: string | null) => {
+    if (!iso) return '—';
+    const normalized = /[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`;
+    const ts = new Date(normalized).getTime();
+    if (Number.isNaN(ts)) return '—';
+    const diffSec = Math.max(0, (Date.now() - ts) / 1000);
+    if (diffSec < 60) return '刚刚';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} 分钟前`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} 小时前`;
+    const days = Math.floor(diffSec / 86400);
+    if (days < 30) return `${days} 天前`;
+    return new Date(iso).toLocaleDateString();
+  };
+
   return (
     <div className="p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-gray-900 mb-8">系统总览</h1>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -61,7 +151,7 @@ export function Dashboard() {
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-1">总植物数</p>
-            <p className="text-3xl text-gray-900">{mockStats.totalPlants}</p>
+            <p className="text-3xl text-gray-900">{stats?.total_plants ?? '—'}</p>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -71,7 +161,7 @@ export function Dashboard() {
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-1">24h 活跃植物</p>
-            <p className="text-3xl text-gray-900">{mockStats.activePlants24h}</p>
+            <p className="text-3xl text-gray-900">{stats?.active_last_24h ?? '—'}</p>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -81,7 +171,7 @@ export function Dashboard() {
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-1">异常状态植物</p>
-            <p className="text-3xl text-gray-900">{mockStats.stressedPlants}</p>
+            <p className="text-3xl text-gray-900">{stats?.abnormal_plants ?? '—'}</p>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -91,17 +181,16 @@ export function Dashboard() {
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-1">今日生成梦境</p>
-            <p className="text-3xl text-gray-900">{mockStats.todayDreams}</p>
+            <p className="text-3xl text-gray-900">{stats?.dreams_generated_today ?? '—'}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Plant List */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl border border-gray-200">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-gray-900 mb-4">植物列表</h2>
-                
+
                 <div className="flex gap-4 mb-4">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -113,89 +202,113 @@ export function Dashboard() {
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
-                  
+
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
-                    <option value="all">全部状态</option>
+                <option value="all">全部状态</option>
                     <option value="healthy">健康</option>
                     <option value="slightly_stressed">轻微压力</option>
                     <option value="stressed">严重压力</option>
-                    <option value="insufficient_data">数据不足</option>
+                    <option value="unknown">数据不足</option>
                   </select>
                 </div>
               </div>
 
               <div className="divide-y divide-gray-200">
-                {filteredPlants.map((plant) => (
-                  <div
-                    key={plant.id}
-                    onClick={() => navigate(`/plants/${plant.id}`)}
-                    className="p-6 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                          <Leaf className="w-6 h-6 text-green-600" />
+                {loading && <div className="p-6 text-gray-500">加载中...</div>}
+                {!loading && filteredPlants.length === 0 && (
+                  <div className="p-6 text-gray-500">暂无植物</div>
+                )}
+                {filteredPlants.map((plant) => {
+                  const analysis = analysisMap[plant.id];
+                  const status = mapGrowthStatus(analysis?.growth_status);
+                  const growthRate =
+                    typeof analysis?.growth_rate_3d === 'number' && Number.isFinite(analysis.growth_rate_3d)
+                      ? analysis.growth_rate_3d
+                      : null;
+                  const metrics = metricsMap[plant.id];
+                  const dream = dreamMap[plant.id];
+                  const latestTimestamp =
+                    metrics?.meta?.last_sensor_timestamp ||
+                    metrics?.weight?.weight_at ||
+                    metrics?.temperature?.temp_at ||
+                    metrics?.soil_moisture?.soil_at ||
+                    metrics?.light?.light_at;
+                  const latestDataText = metrics
+                    ? `${timeAgo(latestTimestamp)} · ${metrics.temperature.temp_now ?? '—'}°C / ${metrics.soil_moisture.soil_now ?? '—'}% / ${metrics.weight.weight_now ?? '—'}g`
+                    : '—';
+                  const latestDreamText = dream?.created_at ? timeAgo(dream.created_at) : '—';
+                  return (
+                    <div
+                      key={plant.id}
+                      onClick={() => navigate(`/plants/${plant.id}`)}
+                      className="p-6 hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <Leaf className="w-6 h-6 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-gray-900">{plant.nickname || '未命名'}</h3>
+                            <p className="text-sm text-gray-500">{plant.species || '未填写种类'}</p>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(status)}`}>
+                          {getStatusText(status)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">最近数据</p>
+                          <p className="text-gray-900">{latestDataText}</p>
                         </div>
                         <div>
-                          <h3 className="text-gray-900">{plant.nickname}</h3>
-                          <p className="text-sm text-gray-500">{plant.species}</p>
+                          <p className="text-gray-500">最近梦境</p>
+                          <p className="text-gray-900">{latestDreamText}</p>
                         </div>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(plant.status)}`}>
-                        {getStatusText(plant.status)}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-500">最近数据</p>
-                        <p className="text-gray-900">{plant.lastUpdate}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">最近梦境</p>
-                        <p className="text-gray-900">{plant.lastDream}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">生长率</p>
-                        <div className="flex items-center gap-1">
-                          {getGrowthIcon(plant.growthRate)}
-                          <span className="text-gray-900">{plant.growthRate > 0 ? '+' : ''}{plant.growthRate.toFixed(1)}%</span>
+                        <div>
+                          <p className="text-gray-500">生长率</p>
+                          <div className="flex items-center gap-1">
+                            {getGrowthIcon(growthRate ?? 0)}
+                            <span className="text-gray-900">
+                              {growthRate != null ? `${growthRate.toFixed(1)}%` : '—'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          {/* Right Column */}
           <div className="space-y-6">
-            {/* Alerts */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h2 className="text-gray-900 mb-4">最近异常提醒</h2>
               <div className="space-y-3">
-                {mockAlerts.map((alert) => (
+                {alerts.map((alert) => (
                   <div key={alert.id} className="flex gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm text-gray-900">{alert.message}</p>
-                      <p className="text-xs text-gray-500 mt-1">{alert.time}</p>
+                      <p className="text-xs text-gray-500 mt-1">{new Date(alert.created_at).toLocaleString()}</p>
                     </div>
                   </div>
                 ))}
+                {!alerts.length && !loading && <p className="text-sm text-gray-500">暂无提醒</p>}
               </div>
             </div>
 
-            {/* Recent Dreams */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h2 className="text-gray-900 mb-4">近期梦境预览</h2>
               <div className="grid grid-cols-2 gap-3">
-                {mockRecentDreams.map((dream) => (
+                {dreams.map((dream) => (
                   <div
                     key={dream.id}
                     onClick={() => navigate('/dreams')}
@@ -206,10 +319,13 @@ export function Dashboard() {
                         <Sparkles className="w-8 h-8 text-purple-400" />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-600">{dream.plantName}</p>
-                    <p className="text-xs text-gray-400">{dream.time}</p>
+                    <p className="text-xs text-gray-600">{dream.nickname || `Plant #${dream.plant_id}`}</p>
+                    <p className="text-xs text-gray-400">{new Date(dream.created_at).toLocaleString()}</p>
                   </div>
                 ))}
+                {!dreams.length && !loading && (
+                  <p className="text-sm text-gray-500 col-span-2">暂无梦境图片</p>
+                )}
               </div>
               <button
                 onClick={() => navigate('/dreams')}
@@ -224,3 +340,16 @@ export function Dashboard() {
     </div>
   );
 }
+  const mapGrowthStatus = (status: string | null | undefined) => {
+    switch (status) {
+      case 'normal':
+        return 'healthy';
+      case 'slow':
+      case 'stagnant':
+        return 'slightly_stressed';
+      case 'stressed':
+        return 'stressed';
+      default:
+        return 'unknown';
+    }
+  };
