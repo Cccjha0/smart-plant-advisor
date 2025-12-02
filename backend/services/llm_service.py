@@ -36,7 +36,7 @@ class LLMService:
                 def _str_or_blank(v):
                     return "" if v is None else str(v)
                 growth_rate_val = analysis_payload.get("growth_rate_3d")
-                growth_rate_str = str(growth_rate_val) if growth_rate_val is not None else "unknown"
+                growth_rate_str = str(growth_rate_val) if growth_rate_val is not None else "0"
                 growth_status_str = _str_or_blank(analysis_payload.get("growth_status")) or "unknown"
                 image_url_val = analysis_payload.get("image_url")
 
@@ -54,6 +54,7 @@ class LLMService:
 
                 # drop any None values to avoid invalid inputs
                 full_payload = {k: v for k, v in base_payload.items() if v is not None}
+                self.logger.info("LLMService.generate: sending payload to Coze", extra={"coze_payload_keys": list(full_payload.keys())})
                 result = self.workflow.analyze_with_growth_payload(full_payload)
                 if result:
                     return result
@@ -81,35 +82,6 @@ class LLMService:
             "environment_assessment": environment_assessment,
             "suggestions": suggestions,
             "full_analysis": full_analysis,
-            "alert": None,
-        }
-
-    def analyze_image(self, image_url: str, sensor_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Run vision analysis via Coze workflow when available; fallback to mock.
-        """
-        sensor_payload = sensor_data or {}
-        if self.workflow:
-            try:
-                result = self.workflow.analyze_plant(image_url=image_url, sensor_data=sensor_payload)
-                return {
-                    "plant_type": result.get("plant_type"),
-                    "growth_overview": result.get("growth_overview"),
-                    "environment_assessment": result.get("environment_assessment"),
-                    "suggestions": result.get("suggestions"),
-                    "full_analysis": result.get("full_analysis"),
-                    "raw_response": result.get("raw_response"),
-                }
-            except Exception:
-                # On any failure, fall back to mock
-                pass
-
-        return {
-            "plant_type": "unknown",
-            "growth_overview": None,
-            "environment_assessment": None,
-            "suggestions": None,
-            "full_analysis": None,
             "alert": None,
         }
 
