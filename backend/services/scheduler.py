@@ -136,8 +136,8 @@ def _run_single_analysis_and_optionals(
         "plant_id": plant_id,
         "nickname": plant.nickname or "",
         "image_url": None,
-        "metrics_snapshot": {},  # keep empty object, LLMService will JSON-dump
-        "sensor_data": {},
+        "metrics_snapshot": metrics_snapshot,
+        "sensor_data": sensor_data_payload,
     }
 
     llm_short = None
