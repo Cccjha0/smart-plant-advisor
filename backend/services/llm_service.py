@@ -40,16 +40,20 @@ class LLMService:
                 growth_status_str = _str_or_blank(analysis_payload.get("growth_status")) or "unknown"
                 image_url_val = analysis_payload.get("image_url")
 
-                full_payload = {
+                base_payload = {
                     "growth_rate_3d": growth_rate_str,
                     "growth_status": growth_status_str,
-                    "image_url": image_url_val if image_url_val else None,
                     "metrics_snapshot": analysis_payload.get("metrics_snapshot") or {},
                     "nickname": _str_or_blank(analysis_payload.get("nickname")) or "unknown",
                     "plant_id": _str_or_blank(analysis_payload.get("plant_id")) or "unknown",
                     "sensor_data": analysis_payload.get("sensor_data") or {},
                     "stress_factors": analysis_payload.get("stress_factors") or {},
                 }
+                if image_url_val:
+                    base_payload["image_url"] = image_url_val
+
+                # drop any None values to avoid invalid inputs
+                full_payload = {k: v for k, v in base_payload.items() if v is not None}
                 result = self.workflow.analyze_with_growth_payload(full_payload)
                 if result:
                     return result
