@@ -44,9 +44,9 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-gray-900 mb-1">生成梦境花园</h2>
+            <h2 className="text-gray-900 mb-1">Generate dream garden</h2>
             <p className="text-sm text-gray-600">
-              根据当前环境数据和传感器读数，为 {plantName} 生成一张独特的梦境图。
+              Use current environment data and sensor readings to generate a unique dream image for {plantName}.
             </p>
           </div>
           <button
@@ -55,23 +55,23 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
             className="flex items-center gap-2 px-6 py-3 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 text-white rounded-lg transition-colors"
           >
             <Sparkles className={`w-5 h-5 ${isGenerating ? 'animate-pulse' : ''}`} />
-            <span>{isGenerating ? '生成中...' : '立即生成梦境'}</span>
+            <span>{isGenerating ? 'Generating...' : 'Generate dream now'}</span>
           </button>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-gray-900 mb-6">梦境画廊</h2>
+        <h2 className="text-gray-900 mb-6">Dream gallery</h2>
 
         {loading ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">加载中...</p>
+            <p className="text-gray-500">Loading...</p>
           </div>
         ) : plantDreams.length === 0 ? (
           <div className="text-center py-12">
             <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">还没有生成梦境图</p>
-            <p className="text-sm text-gray-400 mt-1">点击上方按钮生成第一张梦境图</p>
+            <p className="text-gray-500">No dream images yet</p>
+            <p className="text-sm text-gray-400 mt-1">Click the button above to generate the first dream image</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -96,7 +96,7 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
                   )}
                 </div>
                 <p className="text-sm text-gray-900 mb-1">{new Date(dream.created_at).toLocaleString()}</p>
-                <p className="text-xs text-gray-500 line-clamp-2">{dream.description || '暂无描述'}</p>
+                <p className="text-xs text-gray-500 line-clamp-2">{dream.description || 'No description'}</p>
               </div>
             ))}
           </div>
@@ -109,7 +109,7 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Sparkles className="w-6 h-6 text-purple-500" />
-                <h2 className="text-gray-900">梦境详情</h2>
+                <h2 className="text-gray-900">Dream details</h2>
               </div>
               <button
                 onClick={() => setSelectedDream(null)}
@@ -133,20 +133,20 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
               </div>
 
               <div className="mb-6">
-                <p className="text-sm text-gray-500 mb-1">生成时间</p>
+                <p className="text-sm text-gray-500 mb-1">Generated at</p>
                 <p className="text-gray-900">{new Date(selectedDream.created_at).toLocaleString()}</p>
               </div>
 
               {selectedDream.environment && (
                 <div className="mb-6">
-                  <p className="text-sm text-gray-500 mb-2">生成时环境参数</p>
+                  <p className="text-sm text-gray-500 mb-2">Environment at generation</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500">温度</p>
+                      <p className="text-xs text-gray-500">Temperature</p>
                       <p className="text-lg text-gray-900">{selectedDream.environment.temperature ?? '—'}°C</p>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500">湿度</p>
+                      <p className="text-xs text-gray-500">Moisture</p>
                     <p className="text-lg text-gray-900">
                       {selectedDream.environment.moisture ?? '—'}%
                       {selectedDream.environment.moisture_raw != null && (
@@ -155,11 +155,11 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
                     </p>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500">光照</p>
+                      <p className="text-xs text-gray-500">Light</p>
                       <p className="text-lg text-gray-900">{selectedDream.environment.light ?? '—'} lux</p>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500">体重</p>
+                      <p className="text-xs text-gray-500">Weight</p>
                       <p className="text-lg text-gray-900">{selectedDream.environment.weight ?? '—'} g</p>
                     </div>
                   </div>
@@ -167,9 +167,9 @@ export function DreamTab({ plantId, plantName }: { plantId: number; plantName: s
               )}
 
               <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                <h3 className="text-gray-900 mb-2">梦境描述</h3>
-                <p className="text-gray-700 leading-relaxed">{selectedDream.description || '暂无描述'}</p>
-                <p className="text-sm text-gray-500 mt-3 break-all">文件路径: {selectedDream.file_path}</p>
+                <h3 className="text-gray-900 mb-2">Dream description</h3>
+                <p className="text-gray-700 leading-relaxed">{selectedDream.description || 'No description'}</p>
+                <p className="text-sm text-gray-500 mt-3 break-all">File path: {selectedDream.file_path}</p>
               </div>
             </div>
           </div>

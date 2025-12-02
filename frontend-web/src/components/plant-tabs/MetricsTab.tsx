@@ -96,7 +96,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
         weight: m.weight,
       }));
     }
-    // 3d/7d 都用 daily-7d（前端裁剪）
+    // 3d/7d both use daily-7d (frontend trims)
     const limit = timeRange === '3d' ? 3 : 7;
     return daily.slice(-limit).map((m) => ({
       time: m.date,
@@ -120,10 +120,10 @@ export function MetricsTab({ plantId }: { plantId: number }) {
     };
 
     return [
-      { name: '温度压力', value: scoreFor('temperature'), max: 10 },
-      { name: '湿度压力', value: scoreFor('humidity'), max: 10 },
-      { name: '光照压力', value: scoreFor('light'), max: 10 },
-      { name: '生长压力', value: scoreFor('growth'), max: 10 },
+      { name: 'Temperature stress', value: scoreFor('temperature'), max: 10 },
+      { name: 'Humidity stress', value: scoreFor('humidity'), max: 10 },
+      { name: 'Light stress', value: scoreFor('light'), max: 10 },
+      { name: 'Growth stress', value: scoreFor('growth'), max: 10 },
     ];
   }, [stressScores]);
 
@@ -133,7 +133,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-gray-600" />
-            <h2 className="text-gray-900">时间区间选择</h2>
+            <h2 className="text-gray-900">Time range</h2>
           </div>
           <div className="flex gap-2">
             {['24h', '3d', '7d'].map((range) => (
@@ -146,9 +146,9 @@ export function MetricsTab({ plantId }: { plantId: number }) {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {range === '24h' && '24小时'}
-                {range === '3d' && '3天'}
-                {range === '7d' && '7天'}
+                {range === '24h' && '24h'}
+                {range === '3d' && '3 days'}
+                {range === '7d' && '7 days'}
               </button>
             ))}
           </div>
@@ -157,7 +157,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-gray-900">多维度数据图表</h2>
+          <h2 className="text-gray-900">Multi-metric charts</h2>
           <div className="flex gap-3">
             {Object.entries(visibleLines).map(([key, visible]) => (
               <label key={key} className="flex items-center gap-2 cursor-pointer">
@@ -174,7 +174,7 @@ export function MetricsTab({ plantId }: { plantId: number }) {
         </div>
 
         {loading ? (
-          <p className="text-gray-500">加载中...</p>
+          <p className="text-gray-500">Loading...</p>
         ) : (
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={chartData}>
@@ -185,16 +185,16 @@ export function MetricsTab({ plantId }: { plantId: number }) {
               <Tooltip />
               <Legend />
               {visibleLines.temperature && (
-                <Line yAxisId="left" type="monotone" dataKey="temperature" stroke="#ef4444" strokeWidth={2} dot={false} name="温度 (°C)" />
+                <Line yAxisId="left" type="monotone" dataKey="temperature" stroke="#ef4444" strokeWidth={2} dot={false} name="Temperature (°C)" />
               )}
               {visibleLines.light && (
-                <Line yAxisId="right" type="monotone" dataKey="light" stroke="#f59e0b" strokeWidth={2} dot={false} name="光照 (lux)" />
+                <Line yAxisId="right" type="monotone" dataKey="light" stroke="#f59e0b" strokeWidth={2} dot={false} name="Light (lux)" />
               )}
               {visibleLines.moisture && (
-                <Line yAxisId="left" type="monotone" dataKey="moisture" stroke="#3b82f6" strokeWidth={2} dot={false} name="湿度 (%)" />
+                <Line yAxisId="left" type="monotone" dataKey="moisture" stroke="#3b82f6" strokeWidth={2} dot={false} name="Moisture (%)" />
               )}
               {visibleLines.weight && (
-                <Line yAxisId="right" type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2} dot={false} name="重量 (g)" />
+                <Line yAxisId="right" type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2} dot={false} name="Weight (g)" />
               )}
             </LineChart>
           </ResponsiveContainer>
@@ -202,11 +202,11 @@ export function MetricsTab({ plantId }: { plantId: number }) {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-gray-900 mb-6">生长算法可视化</h2>
+        <h2 className="text-gray-900 mb-6">Growth algorithm visualization</h2>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
-            <h3 className="text-gray-900 mb-4">日参考体重</h3>
+            <h3 className="text-gray-900 mb-4">Daily reference weight</h3>
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={daily}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -214,13 +214,13 @@ export function MetricsTab({ plantId }: { plantId: number }) {
                 <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2} name="平均重量" />
+                <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2} name="Average weight" />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
           <div>
-            <h3 className="text-gray-900 mb-4">3日生长率</h3>
+            <h3 className="text-gray-900 mb-4">3-day growth rate</h3>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={growthRateData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -228,14 +228,14 @@ export function MetricsTab({ plantId }: { plantId: number }) {
                 <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="rate" fill="#10b981" name="增长率(%)" />
+                <Bar dataKey="rate" fill="#10b981" name="Growth rate (%)" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="mt-6">
-          <h3 className="text-gray-900 mb-4">压力因子分析</h3>
+          <h3 className="text-gray-900 mb-4">Stress factor analysis</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {stressFactors.map((factor, index) => (
               <div key={index} className="p-4 bg-gray-50 rounded-lg">
@@ -265,16 +265,16 @@ export function MetricsTab({ plantId }: { plantId: number }) {
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h2 className="text-gray-900">原始数据表格</h2>
+            <h2 className="text-gray-900">Raw data table</h2>
             <select
               value={rawSensor}
               onChange={(e) => setRawSensor(e.target.value as any)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
             >
-              <option value="temperature">温度</option>
-              <option value="soil_moisture">土壤湿度</option>
-              <option value="light">光照</option>
-              <option value="weight">重量</option>
+              <option value="temperature">Temperature</option>
+              <option value="soil_moisture">Soil moisture</option>
+              <option value="light">Light</option>
+              <option value="weight">Weight</option>
             </select>
           </div>
           <button
@@ -295,22 +295,22 @@ export function MetricsTab({ plantId }: { plantId: number }) {
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
             <Download className="w-4 h-4" />
-            <span className="text-sm">导出 CSV</span>
+            <span className="text-sm">Export CSV</span>
           </button>
         </div>
         <div className="p-6">
           {rawLoading ? (
-            <p className="text-sm text-gray-500">加载中...</p>
+            <p className="text-sm text-gray-500">Loading...</p>
           ) : !rawData || rawData.records.length === 0 ? (
-            <p className="text-sm text-gray-500">暂无数据</p>
+            <p className="text-sm text-gray-500">No data</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full table-fixed text-sm text-left">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="py-3 px-2 text-gray-600 w-1/3">时间</th>
-                    <th className="py-3 px-2 text-gray-600 w-1/3">值</th>
-                    <th className="py-3 px-2 text-gray-600 w-1/3">单位</th>
+                    <th className="py-3 px-2 text-gray-600 w-1/3">Time</th>
+                    <th className="py-3 px-2 text-gray-600 w-1/3">Value</th>
+                    <th className="py-3 px-2 text-gray-600 w-1/3">Unit</th>
                   </tr>
                 </thead>
                 <tbody>

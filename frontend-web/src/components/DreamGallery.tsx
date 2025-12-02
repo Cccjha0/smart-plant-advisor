@@ -46,8 +46,8 @@ export function DreamGallery() {
     <div className="p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-gray-900 mb-2">梦境画廊</h1>
-          <p className="text-gray-600">探索所有植物的梦境花园图片</p>
+          <h1 className="text-gray-900 mb-2">Dream Gallery</h1>
+          <p className="text-gray-600">Explore dream garden images for all plants</p>
         </div>
 
         {/* Filters */}
@@ -57,7 +57,7 @@ export function DreamGallery() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="搜索植物昵称..."
+                placeholder="Search plant nickname..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -71,7 +71,7 @@ export function DreamGallery() {
                 onChange={(e) => setFilterPlant(e.target.value)}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
-                <option value="all">全部植物</option>
+                <option value="all">All plants</option>
                 {plants.map((plant) => (
                   <option key={plant.id} value={plant.id}>
                     {plant.nickname || `Plant #${plant.id}`}
@@ -85,12 +85,12 @@ export function DreamGallery() {
         {/* Gallery */}
         {loading ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <p className="text-gray-500">加载中...</p>
+            <p className="text-gray-500">Loading...</p>
           </div>
         ) : filteredDreams.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">没有找到匹配的梦境图</p>
+            <p className="text-gray-500">No matching dream images</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
@@ -116,7 +116,7 @@ export function DreamGallery() {
                 </div>
                 <h3 className="text-gray-900 mb-1">{getPlantName(dream.plant_id)}</h3>
                 <p className="text-sm text-gray-500 mb-2">{new Date(dream.created_at).toLocaleString()}</p>
-                <p className="text-xs text-gray-600 line-clamp-2">{dream.description || '暂无描述'}</p>
+                <p className="text-xs text-gray-600 line-clamp-2">{dream.description || 'No description'}</p>
               </div>
             ))}
           </div>
@@ -130,7 +130,7 @@ export function DreamGallery() {
                 <div className="flex items-center gap-3">
                   <Sparkles className="w-6 h-6 text-purple-500" />
                   <div>
-                    <h2 className="text-gray-900">{selectedDream.plantName} 的梦境</h2>
+                    <h2 className="text-gray-900">{selectedDream.plantName} dream</h2>
                     <p className="text-sm text-gray-500">{new Date(selectedDream.created_at).toLocaleString()}</p>
                   </div>
                 </div>
@@ -156,21 +156,21 @@ export function DreamGallery() {
                 </div>
 
                 <div className="mb-6">
-                  <p className="text-sm text-gray-500 mb-2">生成时环境快照</p>
+                  <p className="text-sm text-gray-500 mb-2">Environment snapshot</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {['温度', '湿度', '光照', '重量'].map((label) => (
+                    {['Temperature', 'Moisture', 'Light', 'Weight'].map((label) => (
                       <div key={label} className="p-4 bg-gray-50 rounded-lg">
                         <p className="text-xs text-gray-500 mb-1">{label}</p>
-                        <p className="text-xl text-gray-900">暂无数据</p>
+                        <p className="text-xl text-gray-900">No data</p>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <h3 className="text-gray-900 mb-2">完整梦境描述</h3>
-                  <p className="text-gray-700 leading-relaxed">{selectedDream.description || '暂无描述'}</p>
-                  <p className="text-sm text-gray-500 mt-3 break-all">文件路径: {selectedDream.file_path}</p>
+                  <h3 className="text-gray-900 mb-2">Full dream description</h3>
+                  <p className="text-gray-700 leading-relaxed">{selectedDream.description || 'No description'}</p>
+                  <p className="text-sm text-gray-500 mt-3 break-all">File path: {selectedDream.file_path}</p>
                 </div>
               </div>
             </div>
