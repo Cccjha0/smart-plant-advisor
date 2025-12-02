@@ -31,18 +31,18 @@ export function PlantDetail() {
   const plant = useMemo(() => plants.find((p) => p.id === plantIdNum), [plants, plantIdNum]);
 
   const tabs = [
-    { id: 'overview', label: '概览' },
-    { id: 'metrics', label: '实时数据' },
-    { id: 'reports', label: '分析报告' },
-    { id: 'photos', label: '照片' },
-    { id: 'dreams', label: '梦境花园' },
+    { id: 'overview', label: 'Overview' },
+    { id: 'metrics', label: 'Live Data' },
+    { id: 'reports', label: 'Reports' },
+    { id: 'photos', label: 'Photos' },
+    { id: 'dreams', label: 'Dream Garden' },
   ];
 
   if (loading) {
     return (
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
-          <p className="text-gray-500">加载中...</p>
+          <p className="text-gray-500">Loading...</p>
         </div>
       </div>
     );
@@ -52,7 +52,7 @@ export function PlantDetail() {
     return (
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
-          <p className="text-gray-500">植物不存在</p>
+          <p className="text-gray-500">Plant not found</p>
         </div>
       </div>
     );
@@ -67,7 +67,7 @@ export function PlantDetail() {
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span>返回总览</span>
+            <span>Back to overview</span>
           </button>
 
           <div className="flex items-center gap-4">
@@ -75,8 +75,8 @@ export function PlantDetail() {
               <Leaf className="w-8 h-8 text-green-600" />
             </div>
             <div>
-              <h1 className="text-gray-900">{plant.nickname || '未命名'}</h1>
-              <p className="text-gray-500">{plant.species || '未填写种类'}</p>
+              <h1 className="text-gray-900">{plant.nickname || 'Unnamed'}</h1>
+              <p className="text-gray-500">{plant.species || 'Species not set'}</p>
             </div>
           </div>
         </div>
