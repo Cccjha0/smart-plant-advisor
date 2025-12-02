@@ -35,16 +35,6 @@ class WorkflowService:
         self.coze_api_token_cn = os.getenv("COZE_API_TOKEN_CN")
         self.workflow_id_cn = os.getenv("COZE_WORKFLOW_ID_CN")
         self.coze_api_base_cn = os.getenv("COZE_API_BASE_CN", "https://api.coze.cn")
-
-        # 中国区工作流（梦境图片）配置：独立的 token / workflow / base url
-        self.coze_api_token_cn = os.getenv("COZE_API_TOKEN_CN")
-        self.workflow_id_cn = os.getenv("COZE_WORKFLOW_ID_CN")
-        self.coze_api_base_cn = os.getenv("COZE_API_BASE_CN", "https://api.coze.cn")
-        
-        # 如果误配置为中国区，强制使用国际版
-        if "coze.cn" in self.coze_api_base:
-            print(f"警告: 检测到中国区API ({self.coze_api_base})，自动切换为国际版")
-            self.coze_api_base = COZE_COM_BASE_URL
         
         # 可选参数：如果工作流需要关联bot或app
         self.bot_id = os.getenv("COZE_BOT_ID")  # 如果工作流包含数据库节点、变量节点等，可能需要
@@ -358,7 +348,10 @@ class WorkflowService:
         if not self._is_configured:
             raise ValueError("工作流API未配置。请设置 COZE_API_TOKEN 和 COZE_WORKFLOW_ID")
 
-        workflow_inputs = payload
+        # Normalize optional fields to avoid empty strings; omit image_url if missing
+        workflow_inputs = dict(payload)
+        if workflow_inputs.get("image_url") in ("", None):
+            workflow_inputs.pop("image_url", None)
 
         try:
             workflow_run = self._call_workflow_with_retry(workflow_inputs)
@@ -410,4 +403,3 @@ class WorkflowService:
                     error_msg = f"工作流API调用失败（错误码: {e.code}，{getattr(e, 'msg', error_msg)}）"
 
             raise Exception(error_msg)
-

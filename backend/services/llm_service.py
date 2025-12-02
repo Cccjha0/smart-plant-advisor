@@ -35,13 +35,18 @@ class LLMService:
                 self.logger.info("LLMService.generate: using workflow_service with full payload JSON")
                 def _str_or_blank(v):
                     return "" if v is None else str(v)
+                growth_rate_val = analysis_payload.get("growth_rate_3d")
+                growth_rate_str = str(growth_rate_val) if growth_rate_val is not None else "unknown"
+                growth_status_str = _str_or_blank(analysis_payload.get("growth_status")) or "unknown"
+                image_url_val = analysis_payload.get("image_url")
+
                 full_payload = {
-                    "growth_rate_3d": _str_or_blank(analysis_payload.get("growth_rate_3d")),
-                    "growth_status": _str_or_blank(analysis_payload.get("growth_status")),
-                    "image_url": _str_or_blank(analysis_payload.get("image_url")),
+                    "growth_rate_3d": growth_rate_str,
+                    "growth_status": growth_status_str,
+                    "image_url": image_url_val if image_url_val else None,
                     "metrics_snapshot": analysis_payload.get("metrics_snapshot") or {},
-                    "nickname": _str_or_blank(analysis_payload.get("nickname")),
-                    "plant_id": _str_or_blank(analysis_payload.get("plant_id")),
+                    "nickname": _str_or_blank(analysis_payload.get("nickname")) or "unknown",
+                    "plant_id": _str_or_blank(analysis_payload.get("plant_id")) or "unknown",
                     "sensor_data": analysis_payload.get("sensor_data") or {},
                     "stress_factors": analysis_payload.get("stress_factors") or {},
                 }
