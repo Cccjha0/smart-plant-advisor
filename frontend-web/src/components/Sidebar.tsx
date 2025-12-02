@@ -4,8 +4,8 @@ import { LayoutDashboard, Leaf, Sparkles, Settings } from 'lucide-react';
 export function Sidebar() {
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/dreams', icon: Sparkles, label: '梦境画廊' },
-    { to: '/admin', icon: Settings, label: '系统管理' }
+    { to: '/dreams', icon: Sparkles, label: 'Dream Gallery' },
+    { to: '/admin', icon: Settings, label: 'System Admin' }
   ];
 
   return (
@@ -16,7 +16,7 @@ export function Sidebar() {
             <Leaf className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-gray-900">植物监控系统</h1>
+            <h1 className="text-gray-900">Plant Monitoring</h1>
             <p className="text-sm text-gray-500">Plant Monitor</p>
           </div>
         </div>
@@ -46,7 +46,7 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-gray-200">
         <div className="px-4 py-3 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600">系统版本</p>
+          <p className="text-sm text-gray-600">System version</p>
           <p className="text-xs text-gray-500">v1.0.0</p>
         </div>
       </div>

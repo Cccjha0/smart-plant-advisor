@@ -315,9 +315,18 @@ export function Dashboard() {
                     className="cursor-pointer group"
                   >
                     <div className="aspect-square bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg mb-2 overflow-hidden">
-                      <div className="w-full h-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Sparkles className="w-8 h-8 text-purple-400" />
-                      </div>
+                      {dream.file_path ? (
+                        <img
+                          src={dream.file_path}
+                          alt="dream"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Sparkles className="w-8 h-8 text-purple-400" />
+                        </div>
+                      )}
                     </div>
                     <p className="text-xs text-gray-600">{dream.nickname || `Plant #${dream.plant_id}`}</p>
                     <p className="text-xs text-gray-400">{new Date(dream.created_at).toLocaleString()}</p>

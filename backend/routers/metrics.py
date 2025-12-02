@@ -81,20 +81,6 @@ def _watering_signature(moist_before: Optional[float], moist_after: Optional[flo
 
 
 def _last_watering(db: Session, plant_id: int) -> Optional[datetime]:
-    latest = (
-        db.query(SensorRecord.soil_moisture, SensorRecord.timestamp)
-        .filter(SensorRecord.plant_id == plant_id, SensorRecord.soil_moisture.isnot(None))
-        .order_by(SensorRecord.timestamp.desc())
-        .limit(50)
-        .all()
-    )
-    if len(latest) < 2:
-        return None
-    for i in range(len(latest) - 1):
-        m_after, t_after = latest[i]
-        m_before, t_before = latest[i + 1]
-        if _watering_signature(m_before, m_after):
-            return t_after
     return None
 
 
@@ -108,7 +94,7 @@ def _soil_pct(raw: Optional[float]) -> Optional[float]:
 @router.get("/metrics/{plant_id}")
 def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     now = datetime.utcnow()
-    last_watering_ts = _last_watering(db, plant_id)
+    last_watering_ts = None
 
     # Temperature
     temp_now, temp_ts = _latest_value(db, plant_id, SensorRecord.temperature)
@@ -158,19 +144,7 @@ def get_metrics(plant_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
 
     hours_since_last_watering = None
     weight_drop_since_last_watering = None
-    if last_watering_ts and latest_weight:
-        hours_since_last_watering = (now - last_watering_ts).total_seconds() / 3600.0
-        weight_before = (
-            db.query(WeightRecord.weight)
-            .filter(WeightRecord.plant_id == plant_id, WeightRecord.timestamp <= last_watering_ts, WeightRecord.weight.isnot(None))
-            .order_by(WeightRecord.timestamp.desc())
-            .first()
-        )
-        if weight_before:
-            weight_drop_since_last_watering = latest_weight[0] - weight_before[0]
-            # Recompute water loss per hour using post-watering window to avoid watering spikes
-            hours_span = max(1.0, hours_since_last_watering)
-            water_loss_per_hour = weight_drop_since_last_watering / hours_span
+    # watering metrics disabled (no detection)
 
     # determine latest sensor timestamp across streams
     ts_candidates = [temp_ts, soil_ts, light_ts, weight_ts]
