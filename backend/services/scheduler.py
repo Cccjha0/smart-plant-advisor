@@ -186,6 +186,7 @@ def _run_single_analysis_and_optionals(
         dream_result = llm_service.generate_dream_image(plant_id, analysis_payload)
         dream_bytes = dream_result.get("data")
         ext = dream_result.get("ext", "png")
+        description = dream_result.get("describe") or dream_result.get("description") or None
         if dream_bytes:
             ts = int(datetime.utcnow().timestamp())
             ext_clean = ext.lstrip(".") or "png"
@@ -206,7 +207,7 @@ def _run_single_analysis_and_optionals(
                     sensor_record_id=None,
                     weight_record_id=None,
                     file_path=public_url or storage_path,
-                    description=dream_result.get("description"),
+                    description=description,
                     created_at=datetime.utcnow(),
                 )
             )

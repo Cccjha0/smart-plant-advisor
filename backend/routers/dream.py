@@ -50,6 +50,7 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
     dream_result = llm_service.generate_dream_image(payload.plant_id, sensor_payload)
     dream_bytes = dream_result.get("data")
     ext = dream_result.get("ext", "png")
+    description = dream_result.get("describe") or dream_result.get("description")
 
     if not dream_bytes:
         raise HTTPException(status_code=500, detail="dream image generation failed")
@@ -71,7 +72,7 @@ def create_dream_image(payload: DreamCreate, db: Session = Depends(get_db)):
     record = DreamImageRecord(
         plant_id=payload.plant_id,
         file_path=public_url,
-        description=None,
+        description=description,
         created_at=datetime.utcnow(),
     )
 
