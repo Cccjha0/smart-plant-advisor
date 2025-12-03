@@ -102,12 +102,19 @@ def run_cycle(plant_id: int):
     except Exception as e:
         log(f"[ThingsBoard] 调用失败（不影响主流程）: {e}")
         
-    # 10分钟正常上传后也更新一次基准（防止漏掉）
-    with watering_lock:
-        if avg_soil_raw is not None:
+    # ==================== 关键修复：10分钟结束时，强制把基准更新为本次平均值 ====================
+    if avg_soil_raw is not None:
+        with watering_lock:                     # 必须加锁，防止浇水线程同时在改
+            global last_known_soil_raw          # 强制声明全局变量（保险起见）
             last_known_soil_raw = avg_soil_raw
-            log(f"10分钟周期结束，浇水检测基准同步为平均值 → {avg_soil_raw:.1f}")
-        watering_triggered = False
+            
+            # 同时把浇水标记也重置（新一轮10分钟开始）
+            watering_triggered = False
+      
+        log(f"10分钟周期结束 → 浇水检测基准强制更新为最新平均值：{avg_soil_raw:.1f}")
+        log("   下一次浇水将以此值为基准判断下降幅度")
+    else:
+        log("本次 avg_soil_raw 为 None，跳过基准更新")
 # ==================== 新增：实时上传函数（浇水后专用） ====================
 def upload_current_sensor_data(plant_id: int):
     """

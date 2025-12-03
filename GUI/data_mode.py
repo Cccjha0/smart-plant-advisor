@@ -1,4 +1,4 @@
-# data_mode.py  ——  3.5 寸屏满屏终极版（无边距、最大化信息）
+# data_mode.py
 
 import customtkinter as ctk
 import os
@@ -10,34 +10,34 @@ from io import BytesIO
 class DataMode:
     def __init__(self, master):
         self.master = master
-        self.frame = ctk.CTkFrame(master, fg_color="#f0f0f0")   # 浅灰背景更护眼
+        self.frame = ctk.CTkFrame(master, fg_color="#f0f0f0")   
         self.build_ui()
 
     def build_ui(self):
-        # 让 frame 彻底占满
+        
         self.frame.place(relx=0, rely=0, relwidth=1, relheight=1)
 
-        # ============ 1. 超大标题 + 时间 ============
+        
         top = ctk.CTkFrame(self.frame, fg_color="transparent")
         top.pack(fill="x", pady=(4, 0), padx=6)
 
-        # 标题
+        
         ctk.CTkLabel(
             top, text="My Plant",
             font=("微软雅黑", 46, "bold"),
             text_color="#2e8b57"
         ).pack(side="left", padx=10)
 
-        # 时间（关键：先创建，再 pack！）
+        
         self.time_lbl = ctk.CTkLabel(
             top,
             text="",
             font=("微软雅黑", 46),
             text_color="#444444"
         )
-        self.time_lbl.pack(side="right", padx=10)   # 必须分两步！
+        self.time_lbl.pack(side="right", padx=10)   
 
-        # ============ 2. SVG 终极版（实时转 PNG，永不模糊） ============
+        
         cards = ctk.CTkFrame(self.frame, fg_color="transparent")
         cards.pack(fill="x", pady=(8, 12), padx=8)
 
@@ -47,12 +47,12 @@ class DataMode:
             svg_path = os.path.join(icon_dir, svg_name)
             if not os.path.exists(svg_path):
                 return None
-            # 把 SVG 转成 PNG 字节流
+            
             png_data = cairosvg.svg2png(bytestring=open(svg_path, "rb").read(), output_width=size[0], output_height=size[1])
             img = Image.open(BytesIO(png_data))
             return ctk.CTkImage(light_image=img, dark_image=img, size=size)
 
-        # 加载四个图标
+        
         icons = {
             "temperature": load_svg_to_ctkimage("temperature.svg",size=(48,48)),
             "light":       load_svg_to_ctkimage("light.svg",size=(48,48)),
@@ -87,11 +87,11 @@ class DataMode:
 
             self.val_labels[name] = val
 
-        # ============ 3. 建议区保持大字体但留足空间 ============
+        
         self.advice = ctk.CTkLabel(
             self.frame,
             text="加载中…",
-            font=("微软雅黑", 34, "bold"),      # 建议区也放大到 28
+            font=("微软雅黑", 34, "bold"),      
             wraplength=self.master.winfo_screenwidth() - 50,
             justify="left",
             anchor="nw",
@@ -104,19 +104,19 @@ class DataMode:
     def update(self):
         data = fetch_latest_summary()
 
-        # 更新传感器值
+        
         self.val_labels["温度"].configure(text=f"{data['temperature']:.1f}")
         self.val_labels["光照"].configure(text=f"{int(data['light'])}")
         self.val_labels["土壤"].configure(text=f"{int(data['soil_moisture'])}")
         self.val_labels["重量"].configure(text=f"{int(data['weight'])}")
 
-        # 美观建议处理
+        
         raw = data["suggestions"].strip()
         lines = [line.strip() for line in raw.split("\n") if line.strip()]
-        suggestion = "\n".join(lines) if lines else "状态良好，继续保持～"
+        suggestion = "\n".join(lines) if lines else "In good condition, keep it up!"
 
-        # 智能变色
-        warning = any(kw in suggestion for kw in ["浇水", "光照", "过湿", "过干", "下降", "升高", "病虫害"])
+        
+        warning = any(kw in suggestion for kw in ["warting", "lighting", "Excessive moisture", "Too dry", "Too wet","Descend", "Rise up"])
         self.advice.configure(
             text=suggestion,
             text_color="#d4380d" if warning else "#2e8b57"
