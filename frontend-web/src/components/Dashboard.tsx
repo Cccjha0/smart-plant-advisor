@@ -108,13 +108,13 @@ export function Dashboard() {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'healthy':
-        return '健康';
+        return 'Healthy';
       case 'slightly_stressed':
-        return '轻微压力';
+        return 'Mild stress';
       case 'stressed':
-        return '严重压力';
+        return 'Severe stress';
       default:
-        return '数据不足';
+        return 'Not enough data';
     }
   };
 
@@ -130,18 +130,18 @@ export function Dashboard() {
     const ts = new Date(normalized).getTime();
     if (Number.isNaN(ts)) return '—';
     const diffSec = Math.max(0, (Date.now() - ts) / 1000);
-    if (diffSec < 60) return '刚刚';
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} 分钟前`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} 小时前`;
+    if (diffSec < 60) return 'just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} minutes ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} hours ago`;
     const days = Math.floor(diffSec / 86400);
-    if (days < 30) return `${days} 天前`;
+    if (days < 30) return `${days} days ago`;
     return new Date(iso).toLocaleDateString();
   };
 
   return (
     <div className="p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-gray-900 mb-8">系统总览</h1>
+        <h1 className="text-gray-900 mb-8">System Overview</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -150,7 +150,7 @@ export function Dashboard() {
                 <Leaf className="w-6 h-6 text-green-600" />
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-1">总植物数</p>
+            <p className="text-sm text-gray-600 mb-1">Total plants</p>
             <p className="text-3xl text-gray-900">{stats?.total_plants ?? '—'}</p>
           </div>
 
@@ -160,7 +160,7 @@ export function Dashboard() {
                 <Activity className="w-6 h-6 text-blue-600" />
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-1">24h 活跃植物</p>
+            <p className="text-sm text-gray-600 mb-1">Active plants (24h)</p>
             <p className="text-3xl text-gray-900">{stats?.active_last_24h ?? '—'}</p>
           </div>
 
@@ -170,7 +170,7 @@ export function Dashboard() {
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-1">异常状态植物</p>
+            <p className="text-sm text-gray-600 mb-1">Abnormal plants</p>
             <p className="text-3xl text-gray-900">{stats?.abnormal_plants ?? '—'}</p>
           </div>
 
@@ -180,7 +180,7 @@ export function Dashboard() {
                 <Image className="w-6 h-6 text-purple-600" />
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-1">今日生成梦境</p>
+            <p className="text-sm text-gray-600 mb-1">Dreams today</p>
             <p className="text-3xl text-gray-900">{stats?.dreams_generated_today ?? '—'}</p>
           </div>
         </div>
@@ -189,7 +189,7 @@ export function Dashboard() {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl border border-gray-200">
               <div className="p-6 border-b border-gray-200">
-                <h2 className="text-gray-900 mb-4">植物列表</h2>
+                <h2 className="text-gray-900 mb-4">Plant list</h2>
 
                 <div className="flex gap-4 mb-4">
                   <div className="flex-1 relative">
@@ -208,19 +208,19 @@ export function Dashboard() {
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
-                <option value="all">全部状态</option>
-                    <option value="healthy">健康</option>
-                    <option value="slightly_stressed">轻微压力</option>
-                    <option value="stressed">严重压力</option>
-                    <option value="unknown">数据不足</option>
+                <option value="all">All statuses</option>
+                    <option value="healthy">All statuses</option>
+                    <option value="slightly_stressed">Mild stress</option>
+                    <option value="stressed">Severe stress</option>
+                    <option value="unknown">Not enough data</option>
                   </select>
                 </div>
               </div>
 
               <div className="divide-y divide-gray-200">
-                {loading && <div className="p-6 text-gray-500">加载中...</div>}
+                {loading && <div className="p-6 text-gray-500">Loading...</div>}
                 {!loading && filteredPlants.length === 0 && (
-                  <div className="p-6 text-gray-500">暂无植物</div>
+                  <div className="p-6 text-gray-500">No plants</div>
                 )}
                 {filteredPlants.map((plant) => {
                   const analysis = analysisMap[plant.id];
@@ -253,8 +253,8 @@ export function Dashboard() {
                             <Leaf className="w-6 h-6 text-green-600" />
                           </div>
                           <div>
-                            <h3 className="text-gray-900">{plant.nickname || '未命名'}</h3>
-                            <p className="text-sm text-gray-500">{plant.species || '未填写种类'}</p>
+                            <h3 className="text-gray-900">{plant.nickname || 'Unnamed'}</h3>
+                            <p className="text-sm text-gray-500">{plant.species || 'Species not set'}</p>
                           </div>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(status)}`}>
@@ -264,15 +264,15 @@ export function Dashboard() {
 
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
-                          <p className="text-gray-500">最近数据</p>
+                          <p className="text-gray-500">Latest data</p>
                           <p className="text-gray-900">{latestDataText}</p>
                         </div>
                         <div>
-                          <p className="text-gray-500">最近梦境</p>
+                          <p className="text-gray-500">Latest dream</p>
                           <p className="text-gray-900">{latestDreamText}</p>
                         </div>
                         <div>
-                          <p className="text-gray-500">生长率</p>
+                          <p className="text-gray-500">Growth rate</p>
                           <div className="flex items-center gap-1">
                             {getGrowthIcon(growthRate ?? 0)}
                             <span className="text-gray-900">
@@ -290,7 +290,7 @@ export function Dashboard() {
 
           <div className="space-y-6">
             <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-gray-900 mb-4">最近异常提醒</h2>
+              <h2 className="text-gray-900 mb-4">Recent alerts</h2>
               <div className="space-y-3">
                 {alerts.map((alert) => (
                   <div key={alert.id} className="flex gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -301,12 +301,12 @@ export function Dashboard() {
                     </div>
                   </div>
                 ))}
-                {!alerts.length && !loading && <p className="text-sm text-gray-500">暂无提醒</p>}
+                {!alerts.length && !loading && <p className="text-sm text-gray-500">No alerts</p>}
               </div>
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-gray-900 mb-4">近期梦境预览</h2>
+              <h2 className="text-gray-900 mb-4">Recent dreams</h2>
               <div className="grid grid-cols-2 gap-3">
                 {dreams.map((dream) => (
                   <div
@@ -333,14 +333,14 @@ export function Dashboard() {
                   </div>
                 ))}
                 {!dreams.length && !loading && (
-                  <p className="text-sm text-gray-500 col-span-2">暂无梦境图片</p>
+                  <p className="text-sm text-gray-500 col-span-2">No dream images yet</p>
                 )}
               </div>
               <button
                 onClick={() => navigate('/dreams')}
                 className="w-full mt-4 px-4 py-2 text-sm text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
               >
-                查看全部梦境
+                View all dreams
               </button>
             </div>
           </div>
