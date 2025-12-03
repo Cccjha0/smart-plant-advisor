@@ -53,6 +53,13 @@ export type DreamDto = {
   file_path: string;
   description: string | null;
   created_at: string;
+  environment?: {
+    temperature: number | null;
+    moisture: number | null;
+    moisture_raw?: number | null;
+    light: number | null;
+    weight: number | null;
+  } | null;
 };
 
 export type MetricsDto = {

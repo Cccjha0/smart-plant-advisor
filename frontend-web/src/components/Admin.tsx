@@ -70,11 +70,11 @@ export function Admin() {
       { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-700', value: 'text-pink-900' },
     ];
     const entries = [
-      { label: '总植物数', value: src.total_plants },
-      { label: '图像总数', value: src.total_images },
-      { label: '传感器记录', value: src.total_sensor_records },
-      { label: '分析结果', value: src.total_analysis_results },
-      { label: '梦境图总数', value: (src as any).total_dream_images ?? '—' },
+      { label: 'Total plants', value: src.total_plants },
+      { label: 'Total images', value: src.total_images },
+      { label: 'Sensor records', value: src.total_sensor_records },
+      { label: 'Analysis results', value: src.total_analysis_results },
+      { label: 'Dream images', value: (src as any).total_dream_images ?? '—' },
     ];
     return entries.map((e, idx) => ({ ...e, color: colors[idx % colors.length] }));
   }, [stats, sysOverview]);
@@ -83,12 +83,12 @@ export function Admin() {
     <div className="p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-gray-900 mb-2">系统管理</h1>
-          <p className="text-gray-600">监控系统状态和调度任务</p>
+          <h1 className="text-gray-900 mb-2">System Admin</h1>
+          <p className="text-gray-600">Monitor system status and scheduler tasks</p>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <h2 className="text-gray-900 mb-6">系统概况</h2>
+          <h2 className="text-gray-900 mb-6">System Overview</h2>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-8">
             {overviewCards.map((card, idx) => (
@@ -105,9 +105,9 @@ export function Admin() {
           <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
             <Activity className={`w-6 h-6 ${jobsLoading ? 'text-gray-400' : 'text-green-600'}`} />
             <div>
-              <p className="text-gray-900">APScheduler 状态</p>
+              <p className="text-gray-900">APScheduler status</p>
               <p className={`text-sm ${jobsLoading ? 'text-gray-600' : 'text-green-600'}`}>
-                {jobsLoading ? '加载中...' : '运行中（见下方任务列表）'}
+                {jobsLoading ? 'Loading...' : 'Running (see job list below)'}
               </p>
             </div>
           </div>
@@ -118,14 +118,14 @@ export function Admin() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center gap-2 mb-1">
                 <Calendar className="w-5 h-5 text-gray-600" />
-                <h2 className="text-gray-900">已注册的定时任务</h2>
+                <h2 className="text-gray-900">Registered jobs</h2>
               </div>
-              <p className="text-sm text-gray-600">当前系统中运行的所有调度任务</p>
+              <p className="text-sm text-gray-600">All scheduler jobs currently running</p>
             </div>
 
             <div className="divide-y divide-gray-200">
-              {jobsLoading && <div className="p-4 text-sm text-gray-500">加载中...</div>}
-              {!jobsLoading && jobs && jobs.length === 0 && <div className="p-4 text-sm text-gray-500">暂无任务</div>}
+              {jobsLoading && <div className="p-4 text-sm text-gray-500">Loading...</div>}
+              {!jobsLoading && jobs && jobs.length === 0 && <div className="p-4 text-sm text-gray-500">No jobs</div>}
               {(jobs || []).map((job: SchedulerJobDto) => (
                 <div key={job.id} className="p-4">
                   <div className="flex items-start justify-between mb-2">
@@ -134,13 +134,13 @@ export function Admin() {
                       <p className="text-sm text-gray-600 mt-1">{job.description}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs border ${getJobStatusColor(job.status)}`}>
-                      {job.status === 'running' ? '运行中' : '已暂停'}
+                      {job.status === 'running' ? 'Running' : 'Paused'}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span>调度: {job.schedule}</span>
+                    <span>Schedule: {job.schedule}</span>
                     <span>·</span>
-                    <span>下次执行: {job.nextRun || '—'}</span>
+                    <span>Next run: {job.nextRun || '—'}</span>
                   </div>
                 </div>
               ))}
@@ -151,14 +151,14 @@ export function Admin() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center gap-2 mb-1">
                 <Database className="w-5 h-5 text-gray-600" />
-                <h2 className="text-gray-900">调度执行日志</h2>
+                <h2 className="text-gray-900">Scheduler logs</h2>
               </div>
-              <p className="text-sm text-gray-600">最近的任务执行记录</p>
+              <p className="text-sm text-gray-600">Recent task execution records</p>
             </div>
 
             <div className="divide-y divide-gray-200 max-h-[400px] overflow-y-auto">
-              {logsLoading && <div className="p-4 text-sm text-gray-500">加载中...</div>}
-              {!logsLoading && logs && logs.length === 0 && <div className="p-4 text-sm text-gray-500">暂无日志</div>}
+              {logsLoading && <div className="p-4 text-sm text-gray-500">Loading...</div>}
+              {!logsLoading && logs && logs.length === 0 && <div className="p-4 text-sm text-gray-500">No logs</div>}
               {(logs || []).map((log: SchedulerLogDto) => (
                 <div key={log.id} className="p-4">
                   <div className="flex items-start gap-3">
@@ -170,7 +170,7 @@ export function Admin() {
                       </div>
                       {log.message && <p className="text-sm text-gray-600">{log.message}</p>}
                       <p className="text-xs text-gray-400 mt-1">
-                        执行时长: {log.durationSeconds != null ? `${log.durationSeconds}s` : '—'}
+                        Duration: {log.durationSeconds != null ? `${log.durationSeconds}s` : '—'}
                       </p>
                     </div>
                   </div>
@@ -181,8 +181,8 @@ export function Admin() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-gray-900 mb-4">手动触发区</h2>
-          <p className="text-sm text-gray-600 mb-6">用于开发和演示的手动操作入口</p>
+          <h2 className="text-gray-900 mb-4">Manual triggers</h2>
+          <p className="text-sm text-gray-600 mb-6">For development and demo</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button
@@ -191,8 +191,8 @@ export function Admin() {
             >
               <Play className="w-6 h-6 text-green-600" />
               <div className="text-left">
-                <p className="text-gray-900">触发全量植物分析</p>
-                <p className="text-sm text-gray-600">对所有植物执行一次完整分析</p>
+                <p className="text-gray-900">Run full plant analysis</p>
+                <p className="text-sm text-gray-600">Execute one complete analysis for all plants</p>
               </div>
             </button>
 
@@ -202,8 +202,8 @@ export function Admin() {
             >
               <Play className="w-6 h-6 text-purple-600" />
               <div className="text-left">
-                <p className="text-gray-900">生成所有梦境图</p>
-                <p className="text-sm text-gray-600">为每个植物生成一张梦境花园图</p>
+                <p className="text-gray-900">Generate all dream images</p>
+                <p className="text-sm text-gray-600">Create one dream garden image per plant</p>
               </div>
             </button>
 
@@ -213,8 +213,8 @@ export function Admin() {
             >
               <Play className="w-6 h-6 text-blue-600" />
               <div className="text-left">
-                <p className="text-gray-900">触发全量报告生成</p>
-                <p className="text-sm text-gray-600">为所有植物生成 LLM 分析报告</p>
+                <p className="text-gray-900">Run all reports</p>
+                <p className="text-sm text-gray-600">Generate LLM analysis reports for all plants</p>
               </div>
             </button>
 
@@ -224,8 +224,8 @@ export function Admin() {
             >
               <Play className="w-6 h-6 text-orange-600" />
               <div className="text-left">
-                <p className="text-gray-900">清理旧数据</p>
-                <p className="text-sm text-gray-600">清理30天前的传感器数据</p>
+                <p className="text-gray-900">Clean old data</p>
+                <p className="text-sm text-gray-600">Remove sensor data older than 30 days</p>
               </div>
             </button>
           </div>

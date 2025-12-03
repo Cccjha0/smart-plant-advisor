@@ -17,7 +17,7 @@ SAMPLE_INTERVAL = 3             # seconds between samples
 # Camera
 CAMERA_EV = 6
 CAMERA_GAIN = 4
-CAMERA_WARMUP_SEC = 5
+CAMERA_WARMUP_SEC = 6
 
 # Network
 TIMEOUT = 30

@@ -9,6 +9,7 @@ from database import SessionLocal
 from models import (
     AnalysisResult,
     DreamImageRecord,
+    ImageRecord,
     Plant,
     Alert,
     SchedulerJob,
@@ -44,16 +45,6 @@ JOB_METADATA = {
         "name": "数据清理任务",
         "description": "每周清理30天前的旧传感器数据",
         "cron_expr": "0 2 * * 0",
-    },
-    "periodic_llm_and_dream": {
-        "name": "6小时LLM+梦境",
-        "description": "每6小时生成一次 LLM 报告并生成梦境图（仅启动时手动触发）",
-        "cron_expr": "0 */6 * * *",
-    },
-    "post_watering": {
-        "name": "浇水后一次性任务",
-        "description": "浇水后 1 小时运行一次完整管线",
-        "cron_expr": None,
     },
 }
 
@@ -114,6 +105,7 @@ def _run_single_analysis_and_optionals(
     trigger: str = "default",
 ) -> None:
     plant_id = plant.id
+    now = datetime.utcnow()
     seven_days_ago = datetime.utcnow() - timedelta(days=7)
 
     agg = (
@@ -129,6 +121,142 @@ def _run_single_analysis_and_optionals(
         .one()
     )
 
+    # Latest sensor & weight
+    latest_sensor = (
+        db.query(SensorRecord)
+        .filter(SensorRecord.plant_id == plant_id)
+        .order_by(SensorRecord.timestamp.desc())
+        .first()
+    )
+    latest_weight = (
+        db.query(WeightRecord)
+        .filter(WeightRecord.plant_id == plant_id)
+        .order_by(WeightRecord.timestamp.desc())
+        .first()
+    )
+    latest_image = (
+        db.query(ImageRecord)
+        .filter(ImageRecord.plant_id == plant_id)
+        .order_by(ImageRecord.captured_at.desc())
+        .first()
+    )
+
+    # Aggregations for last 24h and 6h/1h
+    since_24h = now - timedelta(hours=24)
+    since_6h = now - timedelta(hours=6)
+    since_1h = now - timedelta(hours=1)
+
+    agg_24h = (
+        db.query(
+            func.min(SensorRecord.temperature),
+            func.max(SensorRecord.temperature),
+            func.avg(SensorRecord.temperature),
+            func.min(SensorRecord.soil_moisture),
+            func.max(SensorRecord.soil_moisture),
+            func.avg(SensorRecord.light),
+            func.sum(SensorRecord.light),
+        )
+        .filter(SensorRecord.plant_id == plant_id, SensorRecord.timestamp >= since_24h)
+        .one()
+    )
+    temp_24h_min, temp_24h_max, temp_24h_avg, soil_24h_min, soil_24h_max, light_24h_avg, light_24h_sum = agg_24h
+
+    temp_6h_avg = (
+        db.query(func.avg(SensorRecord.temperature))
+        .filter(SensorRecord.plant_id == plant_id, SensorRecord.timestamp >= since_6h)
+        .scalar()
+    )
+    light_1h_avg = (
+        db.query(func.avg(SensorRecord.light))
+        .filter(SensorRecord.plant_id == plant_id, SensorRecord.timestamp >= since_1h)
+        .scalar()
+    )
+
+    # Soil trend (24h): compare earliest vs latest in window
+    soil_24h_first = (
+        db.query(SensorRecord.soil_moisture)
+        .filter(SensorRecord.plant_id == plant_id, SensorRecord.timestamp >= since_24h)
+        .order_by(SensorRecord.timestamp.asc())
+        .first()
+    )
+    soil_24h_last = (
+        db.query(SensorRecord.soil_moisture)
+        .filter(SensorRecord.plant_id == plant_id, SensorRecord.timestamp >= since_24h)
+        .order_by(SensorRecord.timestamp.desc())
+        .first()
+    )
+    soil_trend = "stable"
+    if soil_24h_first and soil_24h_last and soil_24h_first[0] is not None and soil_24h_last[0] is not None:
+        diff = soil_24h_last[0] - soil_24h_first[0]
+        if diff <= -5:
+            soil_trend = "down"
+        elif diff >= 5:
+            soil_trend = "up"
+        else:
+            soil_trend = "stable"
+
+    # Weight deltas
+    weight_24h_ref = (
+        db.query(WeightRecord)
+        .filter(WeightRecord.plant_id == plant_id, WeightRecord.timestamp <= since_24h)
+        .order_by(WeightRecord.timestamp.desc())
+        .first()
+    )
+    weight_now = latest_weight.weight if latest_weight else None
+    weight_24h_diff = None
+    water_loss_per_hour = None
+    if weight_now is not None and weight_24h_ref and weight_24h_ref.weight is not None:
+        weight_24h_diff = weight_now - weight_24h_ref.weight
+        hours = max((now - weight_24h_ref.timestamp).total_seconds() / 3600.0, 1e-3)
+        water_loss_per_hour = weight_24h_diff / hours
+
+    hours_since_last_watering = None
+    weight_drop_since_last_watering = None
+    if plant and plant.last_watered_at:
+        hours_since_last_watering = round((now - plant.last_watered_at).total_seconds() / 3600.0, 2)
+        ref_weight = (
+            db.query(WeightRecord)
+            .filter(WeightRecord.plant_id == plant_id, WeightRecord.timestamp >= plant.last_watered_at)
+            .order_by(WeightRecord.timestamp.asc())
+            .first()
+        )
+        if weight_now is not None and ref_weight and ref_weight.weight is not None:
+            weight_drop_since_last_watering = weight_now - ref_weight.weight
+
+    metrics_snapshot = {
+        "temperature": {
+            "temp_now": latest_sensor.temperature if latest_sensor else 0,
+            "temp_6h_avg": temp_6h_avg or 0,
+            "temp_24h_min": temp_24h_min or 0,
+            "temp_24h_max": temp_24h_max or 0,
+        },
+        "soil_moisture": {
+            "soil_now": latest_sensor.soil_moisture if latest_sensor else 0,
+            "soil_24h_min": soil_24h_min or 0,
+            "soil_24h_max": soil_24h_max or 0,
+            "soil_24h_trend": soil_trend,
+        },
+        "light": {
+            "light_now": latest_sensor.light if latest_sensor else 0,
+            "light_1h_avg": light_1h_avg or 0,
+            "light_today_sum": light_24h_sum or 0,
+        },
+        "weight": {
+            "weight_now": weight_now if weight_now is not None else 0,
+            "weight_24h_diff": weight_24h_diff if weight_24h_diff is not None else 0,
+            "water_loss_per_hour": water_loss_per_hour if water_loss_per_hour is not None else 0,
+            "hours_since_last_watering": hours_since_last_watering if hours_since_last_watering is not None else 0,
+            "weight_drop_since_last_watering": weight_drop_since_last_watering if weight_drop_since_last_watering is not None else 0,
+        },
+    }
+
+    sensor_data_payload = {
+        "temperature": latest_sensor.temperature if latest_sensor else 0,
+        "light": latest_sensor.light if latest_sensor else 0,
+        "soil_moisture": latest_sensor.soil_moisture if latest_sensor else 0,
+        "weight": weight_now if weight_now is not None else 0,
+    }
+
     sensor_summary_7d = {
         "avg_temperature": agg[0],
         "avg_light": agg[1],
@@ -141,21 +269,54 @@ def _run_single_analysis_and_optionals(
         "growth_status": growth_result.get("growth_status"),
         "growth_rate_3d": growth_result.get("growth_rate_3d"),
         "sensor_summary_7d": sensor_summary_7d,
-        "stress_factors": growth_result.get("stress_factors", []),
+        "stress_factors": growth_result.get("stress_factors")
+        or {
+            "humidity_pressure": 0,
+            "light_pressure": 0,
+            "soil_dry_pressure": 0,
+            "temperature_pressure": 0,
+        },
+        # Fields expected by LLM workflow (align with manual /report)
+        "plant_id": plant_id,
+        "nickname": plant.nickname or "",
+        "image_url": latest_image.file_path if latest_image else None,
+        "metrics_snapshot": metrics_snapshot,
+        "sensor_data": sensor_data_payload,
     }
 
     llm_short = None
     llm_long = None
     plant_type = None
     alert_msg = None
+    growth_overview = None
+    environment_assessment = None
+    suggestions_val = None
     if include_llm:
         llm_output = llm_service.generate(analysis_payload)
-        llm_short = llm_output.get("growth_overview") or llm_output.get("short_report")
-        llm_long = llm_output.get("full_analysis") or llm_output.get("long_report")
-        plant_type = llm_output.get("plant_type")
+        merged_output = {}
+        merged_output.update(llm_output or {})
+        analysis_json_raw = merged_output.get("analysis_json")
+        if analysis_json_raw:
+            try:
+                import json
+
+                parsed = json.loads(analysis_json_raw)
+                if isinstance(parsed, dict):
+                    merged_output.update(parsed)
+            except Exception:
+                pass
+
+        plant_type = merged_output.get("plant_type")
         if (plant_type is None or plant_type == "" or plant_type == "unknown") and plant.species:
             plant_type = plant.species
-        alert_msg = llm_output.get("alert")
+        alert_msg = merged_output.get("alert")
+        growth_overview = merged_output.get("growth_overview") or merged_output.get("short_report")
+        environment_assessment = merged_output.get("environment_assessment")
+        suggestions_val = merged_output.get("suggestions")
+        if isinstance(suggestions_val, list):
+            suggestions_val = "\n".join([str(s) for s in suggestions_val])
+        llm_short = growth_overview
+        llm_long = merged_output.get("full_analysis") or merged_output.get("long_report")
 
     analysis_record = AnalysisResult(
         plant_id=plant_id,
@@ -163,9 +324,9 @@ def _run_single_analysis_and_optionals(
         growth_rate_3d=analysis_payload["growth_rate_3d"],
         plant_type=plant_type,
         trigger=trigger,
-        growth_overview=llm_short,
-        environment_assessment=None,
-        suggestions=None,
+        growth_overview=growth_overview,
+        environment_assessment=environment_assessment,
+        suggestions=suggestions_val,
         full_analysis=llm_long,
         created_at=datetime.utcnow(),
     )
@@ -191,6 +352,21 @@ def _run_single_analysis_and_optionals(
         dream_result = llm_service.generate_dream_image(plant_id, analysis_payload)
         dream_bytes = dream_result.get("data")
         ext = dream_result.get("ext", "png")
+        description = dream_result.get("describe") or dream_result.get("description") or None
+        url = dream_result.get("url")
+        latest_sensor_row = (
+            db.query(SensorRecord)
+            .filter(SensorRecord.plant_id == plant_id)
+            .order_by(SensorRecord.timestamp.desc())
+            .first()
+        )
+        latest_weight_row = (
+            db.query(WeightRecord)
+            .filter(WeightRecord.plant_id == plant_id, WeightRecord.weight.isnot(None))
+            .order_by(WeightRecord.timestamp.desc())
+            .first()
+        )
+        file_path = None
         if dream_bytes:
             ts = int(datetime.utcnow().timestamp())
             ext_clean = ext.lstrip(".") or "png"
@@ -204,14 +380,48 @@ def _run_single_analysis_and_optionals(
                 )
             except Exception:
                 public_url = None
+            file_path = public_url or storage_path
+        elif url:
+            # download Coze URL and re-upload to Supabase
+            import requests
 
+            try:
+                resp = requests.get(url, timeout=10)
+                resp.raise_for_status()
+                content = resp.content
+                if not content:
+                    raise Exception("empty image content from Coze URL")
+                ct = resp.headers.get("Content-Type", "")
+                ext_guess = "png"
+                if "jpeg" in ct:
+                    ext_guess = "jpg"
+                elif "png" in ct:
+                    ext_guess = "png"
+                elif "webp" in ct:
+                    ext_guess = "webp"
+                elif "gif" in ct:
+                    ext_guess = "gif"
+                ts = int(datetime.utcnow().timestamp())
+                storage_path = f"{plant_id}/{ts}.{ext_guess}"
+                public_url = upload_bytes(
+                    SUPABASE_DREAM_BUCKET,
+                    storage_path,
+                    content,
+                    f"image/{ext_guess}",
+                )
+                file_path = public_url or storage_path
+            except Exception:
+                # as a last resort, store the Coze URL
+                file_path = url
+
+        if file_path:
             db.add(
                 DreamImageRecord(
                     plant_id=plant_id,
-                    sensor_record_id=None,
-                    weight_record_id=None,
-                    file_path=public_url or storage_path,
-                    description=dream_result.get("description"),
+                    sensor_record_id=latest_sensor_row.id if latest_sensor_row else None,
+                    weight_record_id=latest_weight_row.id if latest_weight_row else None,
+                    file_path=file_path,
+                    description=description,
                     created_at=datetime.utcnow(),
                 )
             )
@@ -365,51 +575,6 @@ def run_weekly_data_cleanup(retention_days: int = 30):
         db.close()
 
 
-def run_post_watering_job(plant_id: int):
-    started_at = datetime.utcnow()
-    db = SessionLocal()
-    try:
-        plant = db.query(Plant).filter(Plant.id == plant_id).first()
-        if not plant:
-            _log_job_run("post_watering", "warning", f"Plant {plant_id} not found", started_at, datetime.utcnow())
-            return
-
-        if not _has_recent_data(db, plant_id, days=1):
-            _log_job_run("post_watering", "warning", f"No recent data for plant {plant_id}", started_at, datetime.utcnow())
-            return
-
-        _run_single_analysis_and_optionals(
-            plant=plant,
-            db=db,
-            include_llm=True,
-            include_dream=True,
-            trigger="watering",
-        )
-
-        db.commit()
-        _log_job_run("post_watering", "success", f"Post-watering pipeline for plant {plant_id}", started_at, datetime.utcnow())
-    except Exception as exc:
-        db.rollback()
-        _log_job_run("post_watering", "failed", f"Error: {exc}", started_at, datetime.utcnow())
-    finally:
-        db.close()
-
-
-def schedule_post_watering_job(plant_id: int, delay_minutes: int = 60):
-    run_date = datetime.utcnow() + timedelta(minutes=delay_minutes)
-    job_id = f"post_watering_{plant_id}_{int(run_date.timestamp())}"
-
-    scheduler.add_job(
-        run_post_watering_job,
-        "date",
-        run_date=run_date,
-        args=[plant_id],
-        id=job_id,
-        replace_existing=False,
-    )
-    _sync_jobs_table()
-
-
 def _sync_jobs_table():
     db = SessionLocal()
     try:
@@ -476,14 +641,15 @@ def run_job_now(job_key: str):
         "periodic_llm_report": run_periodic_llm_report,
         "periodic_dream_image": run_periodic_dream_image,
         "weekly_data_cleanup": run_weekly_data_cleanup,
-        "periodic_llm_and_dream": run_periodic_llm_and_dream,
     }
     fn = fn_map.get(job_key)
     if fn:
+        started_at = datetime.utcnow()
         try:
             fn()
-        except Exception:
-            pass
+            _log_job_run(job_key, "success", "manual run completed", started_at, datetime.utcnow())
+        except Exception as exc:
+            _log_job_run(job_key, "failed", f"manual run error: {exc}", started_at, datetime.utcnow())
     _sync_jobs_table()
 
 
