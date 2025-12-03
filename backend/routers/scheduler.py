@@ -14,24 +14,24 @@ router = APIRouter()
 
 def _human_readable_schedule(cron_expr: str | None) -> str:
     if not cron_expr:
-        return "未配置"
+        return "Not scheduled"
     parts = cron_expr.split()
     if len(parts) >= 5:
         minute, hour = parts[0], parts[1]
-        if hour not in ("*", "*/") and minute.isdigit():
+        if hour.isdigit() and minute.isdigit():
             try:
-                return f"每天 {int(hour):02d}:{int(minute):02d}"
+                return f"Daily {int(hour):02d}:{int(minute):02d}"
             except ValueError:
                 pass
         if hour.startswith("*/"):
             try:
                 hours = int(hour.replace("*/", ""))
-                return f"每{hours}小时"
+                return f"Every {hours} hours"
             except ValueError:
                 pass
         if parts[4] == "0" and hour.isdigit() and minute.isdigit():
             # Sunday 02:00 style
-            return f"每周日 {int(hour):02d}:{int(minute):02d}"
+            return f"Every Sunday {int(hour):02d}:{int(minute):02d}"
     return cron_expr
 
 
