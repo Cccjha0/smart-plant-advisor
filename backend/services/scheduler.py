@@ -27,23 +27,23 @@ llm_service = LLMService()
 
 JOB_METADATA = {
     "daily_analysis": {
-        "name": "每日植物分析",
-        "description": "每天 02:00 对所有植物进行生长分析",
+        "name": "Daily plant analysis",
+        "description": "Run growth analysis for all plants at 02:00 every day",
         "cron_expr": "0 2 * * *",
     },
     "periodic_llm_report": {
-        "name": "6小时LLM文字报告",
-        "description": "每6小时生成一次 LLM 分析报告",
+        "name": "6h LLM text report",
+        "description": "Generate an LLM analysis report every 6 hours",
         "cron_expr": "0 */6 * * *",
     },
     "periodic_dream_image": {
-        "name": "6小时梦境图生成",
-        "description": "每6小时生成一次梦境花园图像",
+        "name": "6h dream image generation",
+        "description": "Generate a dream garden image every 6 hours",
         "cron_expr": "0 */6 * * *",
     },
     "weekly_data_cleanup": {
-        "name": "数据清理任务",
-        "description": "每周清理30天前的旧传感器数据",
+        "name": "Data cleanup task",
+        "description": "Clean sensor/weight data older than 30 days every Sunday at 02:00",
         "cron_expr": "0 2 * * 0",
     },
 }
