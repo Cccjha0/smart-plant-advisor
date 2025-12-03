@@ -19,7 +19,7 @@ class SmartPlantFrame(ctk.CTk):
         self.sensor = PIRSensor(on_detect=self.show_data, on_leave=self.show_art)
         self.sensor.start()
 
-        self.show_art()  # 默认艺术模式
+        self.show_art()  
         self.start_clock()
 
     def show_art(self):
@@ -46,4 +46,4 @@ if __name__ == "__main__":
         app.mainloop()
     finally:
         import RPi.GPIO as GPIO
-        GPIO.cleanup()   # 延迟导入 + try-finally，彻底无警告
+        GPIO.cleanup()   
